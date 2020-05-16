@@ -66,12 +66,14 @@ function Brand() {
 
 function Docs() {
   const items = ["Libraries", "Docs", "Community"].map((txt) => (
-    <a key={txt} className={classnames("navbar-item", styles.spacing)}>
-      {txt}
-    </a>
+    <a key={txt} className={classnames("navbar-item", styles.spacing)}>{txt}</a>
   ));
 
-  return <>{items}</>;
+  return (
+    <>
+      {items}
+    </>
+  );
 }
 
 function SocialLinks() {
@@ -84,7 +86,7 @@ function SocialLinks() {
       </a>
       <a className="navbar-item" href="https://github.com/tokio-rs/tokio">
         <span className="icon">
-          <FontAwesomeIcon icon={["fab", "github"]} />{" "}
+          <FontAwesomeIcon icon={["fab", "github"]} />
         </span>
       </a>
       <a className="navbar-item" href="https://discord.gg/tokio">
