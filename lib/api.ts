@@ -33,7 +33,7 @@ export function getLastBlog() {
   return getDateOrderedPaths("blog")[0];
 }
 
-export function getDateOrderedPaths(root) {
+export function getDateOrderedPaths(root: string) {
   return glob
     .sync(`${contentDir}/${root}/*.md`)
     .map((fullPath) => {
