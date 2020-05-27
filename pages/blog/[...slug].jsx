@@ -1,5 +1,6 @@
 import * as content from "../../lib/api";
 import Page from "../../lib/page";
+import util from "util";
 
 const menuSize = 10;
 
@@ -31,8 +32,17 @@ export async function getStaticProps({ params: { slug } }) {
 
     i += 1;
 
-    menu[page.key] = page;
+    const date = new Date(page.date);
+
+    const year = date.getFullYear().toString();
+    menu[year] = menu[year] || [];
+    menu[year].push(page);
   }
 
-  return content.getProps({ blog: menu }, `blog/${slug}`);
+  return content.withAppProps({
+    props: {
+      page,
+      menu,
+    },
+  });
 }
