@@ -1,3 +1,7 @@
+---
+title: "Streams"
+---
+
 # Streams
     * What are streams
     * Iterators/Streams
