@@ -8,7 +8,6 @@ function onscrollUpdateStacks(stackElems) {
   // Find the thing to highlight.
   for (i = 0; i < stackElems.length; ++i) {
     var divBox = stackElems[i][1].getBoundingClientRect();
-    console.log(stackMid, divBox.top, stackElems[i][1]);
     // We want to highlight it if the div is sufficiently far down compared
     // to the floating stack image.
     if (divBox.top < stackMid) {
