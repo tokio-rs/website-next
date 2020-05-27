@@ -1,14 +1,8 @@
-import React, { FC, ReactNode } from "react";
-
 import Head from "next/head";
+import React, { FC } from "react";
 import Navigation from "./nav";
 
-type Props = {
-  blog: any; // TODO: Don't know what this is yet...
-  children: ReactNode;
-};
-
-const Layout: FC<Props> = ({ blog, children }) => (
+const Layout: FC = ({ children }) => (
   <>
     <Head>
       <title>Tokio</title>
@@ -18,7 +12,7 @@ const Layout: FC<Props> = ({ blog, children }) => (
         rel="stylesheet"
       />
     </Head>
-    <Navigation blog={blog} />
+    <Navigation />
     {children}
   </>
 );

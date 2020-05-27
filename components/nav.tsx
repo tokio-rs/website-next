@@ -3,9 +3,6 @@ import classnames from "classnames";
 import Link from "next/link";
 import SocialLinks from "./social-links";
 
-// TODO: what is this thing??
-type Blog = any;
-
 const Brand: FC = () => (
   <Link href="/">
     <a className="navbar-item">
@@ -19,21 +16,14 @@ const Brand: FC = () => (
   </Link>
 );
 
-const Links: FC<{ blog: Blog }> = ({ blog }) => {
-  const links = Object.entries({
-    Docs: "/docs/overview",
-    // Community: "#",
-    Blog: blog.href,
-  }).map(([name, href]) => (
-    <a key={name} href={href} className="navbar-item navbar-text">
-      {name}
-    </a>
-  ));
+const SectionLink: FC<{ href: string }> = ({ href, children }) => (
+  <Link href={href}>
+    <a className="navbar-item navbar-text">{children}</a>
+  </Link>
+);
 
-  return <>{links}</>;
-};
-
-const Navigation: FC<{ blog: Blog }> = ({ blog }) => {
+// TODO: Blog needs to link to latest post
+const Navigation: FC = () => {
   const [expanded, setExpanded] = useState(false);
 
   const toggleNav = useCallback(() => {
@@ -69,10 +59,10 @@ const Navigation: FC<{ blog: Blog }> = ({ blog }) => {
           })}
         >
           <div className="navbar-end">
-            <Links blog={blog} />
-
+            <SectionLink href="/blog">Blog</SectionLink>
+            <SectionLink href="/community">Community</SectionLink>
+            <SectionLink href="/docs/overview">Docs</SectionLink>
             <hr className="is-hidden-touch" />
-
             <SocialLinks />
           </div>
         </div>
