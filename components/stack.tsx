@@ -18,7 +18,7 @@ const STACK_SVG_IDS: string[] = [
   "runtime",
   "hyper",
   "tower",
-  "tonic"
+  "tonic",
 ];
 
 const STACK_LAYERS: StackLayer[] = [
@@ -129,6 +129,8 @@ export default function Stack() {
               {STACK_SVG_IDS.map((id) => (
                 <img key={id} className="tk-stack-active" data-stack-id={id} src={"/img/stack-" + id + ".svg"} />
               ))}
+              {/* Special handling */}
+              <img id="tk-stack-lines" data-stack-id="lines" src="/img/stack-lines.svg" />
             </div>
           </div>
         </div>
