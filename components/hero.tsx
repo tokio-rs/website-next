@@ -3,22 +3,22 @@ import React, { FC } from "react";
 const gettingStarted = "/docs/overview";
 
 const icons = [
-  "bytes",
-  // "hyper",
+  // "bytes",
+  "hyper",
   // "mio",
   // "runtime",
-  // "tonic",
-  // "tower",
+  "tonic",
+  "tower",
   // "tracing",
 ].map((id) => (
   <div key={id} id={`tk-float-${id}`} className="tk-float"><img src={`/img/icons/${id}.svg`} /></div>
 ));
 
 const Hero: FC = () => (
-  <section className="hero is-primary tk-intro tk-hero-bg" id="tk-hero-bg">
-    {icons}
+  <section className="hero is-primary tk-intro">
     <div className="hero-body">
-      <div className="container has-text-centered">
+      <div className="container has-text-centered tk-hero-bg">
+        {icons}
         <h1 className="title">
           Build reliable network applications without compromising speed.
         </h1>
