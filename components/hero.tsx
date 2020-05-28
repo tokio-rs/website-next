@@ -2,8 +2,22 @@ import React, { FC } from "react";
 
 const gettingStarted = "/docs/overview";
 
+const icons = [
+  "bytes",
+  "hyper",
+  "mio",
+  "runtime",
+  "tokio",
+  "tonic",
+  "tower",
+  "tracing",
+].map((id) => (
+  <img key={id} src={`/img/icons/${id}.svg`} className="tk-float" />
+));
+
 const Hero: FC = () => (
-  <section className="hero is-primary tk-intro">
+  <section className="hero is-primary tk-intro tk-hero-bg" id="tk-hero-bg">
+    {icons}
     <div className="hero-body">
       <div className="container has-text-centered">
         <h1 className="title">
