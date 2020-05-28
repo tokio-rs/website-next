@@ -1,8 +1,23 @@
+const monthNames = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 export default function Menu({ href, menu }) {
-  const groups = Object.entries(menu).map(([key, { title, nested }]) => {
+  const groups = menu.map(({ key, title, nested }) => {
     return (
       <React.Fragment key={key}>
-        <p className="menu-label">Tokio</p>
+        <p className="menu-label">{title}</p>
         <Level1 href={href} menu={nested} />
       </React.Fragment>
     );
@@ -13,7 +28,7 @@ export default function Menu({ href, menu }) {
       {groups}
 
       {/* TODO: hook this up, only when needed */}
-      <p className="menu-label">
+      <p className="menu-label tk-menu-back">
         <img
           src="/img/left-arrow.svg"
           style={{
@@ -35,9 +50,25 @@ function Level1({ href, menu }) {
     const hasNested = isActive && entry.nested !== undefined;
     const className = isActive ? "is-active" : "";
 
+    let link;
+
+    if (entry.date) {
+      const date = new Date(entry.date);
+      link = (
+        <a href={entry.href}>
+          <b>
+            {monthNames[date.getMonth()]} {date.getDate()}
+          </b>
+          {entry.title}
+        </a>
+      );
+    } else {
+      link = <a href={entry.href}>{entry.title}</a>;
+    }
+
     return (
       <li key={entry.key} className={className}>
-        <a href={entry.href}>{entry.title}</a>
+        {link}
         {hasNested && (
           <ul>
             <Level2 href={href} menu={entry.nested} />
