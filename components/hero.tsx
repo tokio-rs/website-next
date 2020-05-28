@@ -3,13 +3,13 @@ import React, { FC } from "react";
 const gettingStarted = "/docs/overview";
 
 const icons = [
-  // "bytes",
+  "bytes",
   "hyper",
-  // "mio",
-  // "runtime",
+  "mio",
+  "runtime",
   "tonic",
   "tower",
-  // "tracing",
+  "tracing",
 ].map((id) => (
   <div key={id} id={`tk-float-${id}`} className="tk-float"><img src={`/img/icons/${id}.svg`} /></div>
 ));

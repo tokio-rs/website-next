@@ -144,6 +144,7 @@ $footer-color: white;
     // overflow: hidden;
 
     .tk-float {
+      user-select: none;
       width: 50px;
       height: 50px;
       // top: 50px;
@@ -168,7 +169,23 @@ $footer-color: white;
       left: -200px;
     }
     #tk-float-tower {
-      bottom: 0;
+      bottom: -10px;
+    }
+    #tk-float-bytes {
+      top: 110px;
+      right: -120px;
+    }
+    #tk-float-mio {
+      bottom: 0px;
+      right: 15px;
+    }
+    #tk-float-runtime {
+      bottom: 35px;
+      right: -210px;
+    }
+    #tk-float-tracing {
+      top: 0;
+      right: -190px;
     }
   }
 
