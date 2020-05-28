@@ -140,17 +140,43 @@ $footer-color: white;
   }
 
   &.tk-hero-bg {
-    // position: relative;
+    position: relative;
     // top: 0;
     // left: 0;
     // // z-index: -1;
 
     .tk-float {
-      position: fixed;
+      top: 50px;
+      left: 50px;
+      position: absolute;
       transition: 120s all;
       // color: rgba(3,155,229,0.33);
-      transform: rotate(-23deg);
+      // transform: rotate(-23deg);
+      // background-color: red;
+      animation: spin-clock-wise 8s linear infinite;
       z-index: 0;
+
+      img {
+        animation: spin-counter-clock-wise 8s linear infinite;
+      }
+    }
+  }
+
+  @keyframes spin-clock-wise {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(-360deg);
+    }
+  }
+
+  @keyframes spin-counter-clock-wise {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
     }
   }
 
@@ -169,20 +195,6 @@ $footer-color: white;
     }
   }
 }
-/*
-.test {
-	position: fixed;
-	transition: 120s all;
-	color: rgba(3,155,229,0.33);
-	transform: rotate(-23deg);
-}
-.background {
-	position: fixed;
-	top: 0;
-	left: 0;
-	z-index: -1;
-}
-*/
 
 .tk-features,
 .tk-stack {

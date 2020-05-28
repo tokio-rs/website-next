@@ -4,15 +4,14 @@ const gettingStarted = "/docs/overview";
 
 const icons = [
   "bytes",
-  "hyper",
-  "mio",
-  "runtime",
-  "tokio",
-  "tonic",
-  "tower",
-  "tracing",
+  // "hyper",
+  // "mio",
+  // "runtime",
+  // "tonic",
+  // "tower",
+  // "tracing",
 ].map((id) => (
-  <img key={id} src={`/img/icons/${id}.svg`} className="tk-float" />
+  <div key={id} id={`tk-float-${id}`} className="tk-float"><img src={`/img/icons/${id}.svg`} /></div>
 ));
 
 const Hero: FC = () => (
