@@ -153,10 +153,12 @@ $footer-color: white;
       position: absolute;
       transition: 120s all;
       animation: spin-clock-wise 8s linear infinite;
+      will-change: transform;
       z-index: 0;
 
       img {
         animation: spin-counter-clock-wise 8s linear infinite;
+        will-change: transform;
       }
     }
 
