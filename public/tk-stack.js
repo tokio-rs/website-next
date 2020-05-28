@@ -1,3 +1,5 @@
+var didRunOnce = false;
+
 function onscrollUpdateStacks(stackElems, lines) {
   var i;
   var stackBox = stackElems[0][0].getBoundingClientRect();
@@ -20,7 +22,7 @@ function onscrollUpdateStacks(stackElems, lines) {
   }
 
   for (i = 0; i < stackElems.length; ++i) {
-    var stackId = stackElems[i][0].getAttribute("data-stack-id");
+    var stackId = stackElems[i][0].dataset.stackId;
 
     // Update the elements that don't have the correct state already.
     var shouldBeOpaque = (current == -1) || (current == i);
@@ -36,16 +38,19 @@ function onscrollUpdateStacks(stackElems, lines) {
       }
     } else {
       stackElems[i][0].classList.remove("tk-stack-active");
+
+      if (stackId == "tracing") {
+        lines.classList.remove("tk-stack-active");
+      }
     }
   }
 
-  // Handle the lines
-  var isTracing = current >= 0 && stackElems[current][0].getAttribute("data-stack-id") == "tracing";
+  if (!didRunOnce) {
+    didRunOnce = true;
 
-  if (isTracing) {
-    lines.classList.add("tk-stack-active");
-  } else {
-    lines.classList.remove("tk-stack-active");
+    if (current != -1 && stackElems[current][0].dataset.stackId == "tracing") {
+      lines.classList.add("tk-stack-active");
+    }
   }
 }
 
