@@ -141,6 +141,7 @@ $footer-color: white;
 
   .tk-hero-bg {
     position: relative;
+    min-width: 50%;
 
     .tk-float {
       user-select: none;
@@ -178,7 +179,7 @@ $footer-color: white;
         transform: rotate(0deg);
       }
       100% {
-          transform: rotate(-360deg);
+        transform: rotate(-360deg);
       }
     }
     @keyframes spin-left {
@@ -186,7 +187,7 @@ $footer-color: white;
         transform: rotate(0deg);
       }
       100% {
-          transform: rotate(360deg);
+        transform: rotate(360deg);
       }
     }
 
