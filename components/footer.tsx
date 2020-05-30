@@ -20,7 +20,7 @@ export default function Footer() {
     <footer className="footer">
       <div className="container">
         <div className="columns">
-          <div className="column is-half tk-help">
+          <div className="column is-half tk-help is-hidden-mobile">
             <img
               src="/img/tokio-horizontal.svg"
               alt="tokio-logo"
