@@ -509,4 +509,47 @@ $footer-color: white;
 
 .footer {
   min-height: 40vh;
+
+  .tk-help {
+    position: relative;
+    font-size: $body-font-size;
+
+    .tk-help-links {
+      position: absolute;
+      bottom: 0;
+      padding-bottom: 0.75rem;
+
+      p {
+        display: block;
+        margin-top: 1rem;
+      }
+    }
+
+    .icon {
+      margin-left: 0.5rem;
+
+      svg {
+        height: 2rem;
+        width: 2rem;
+        transform: translateY(0.6rem);
+      }
+    }
+  }
+
+  .tk-footer-libs {
+    font-size: 1rem;
+    font-weight: 400;
+
+    a:hover {
+      color: $magenta;
+    }
+  }
+
+  .tk-footer-libs, .tk-footer-libs a {
+    color: white;
+  }
+
+  .tk-lib-name {
+    font-weight: 600;
+  }
 }
