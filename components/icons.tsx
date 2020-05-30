@@ -22,7 +22,7 @@ const Icon: FC<Props> = ({ children, className = "", viewBox = DEFAULT_VIEW_BOX 
   </span>
 );
 
-export function GitHubIcon({className}) {
+export function GitHubIcon({className = ""}) {
   return (
     <Icon className={className}>
       <path
@@ -33,7 +33,7 @@ export function GitHubIcon({className}) {
   );
 }
 
-export function TwitterIcon({className}) {
+export function TwitterIcon({className = ""}) {
   return (
     <Icon className={className}>
       <path
@@ -44,7 +44,7 @@ export function TwitterIcon({className}) {
   );
 }
 
-export function DiscordIcon({className}) {
+export function DiscordIcon({className = ""}) {
   return (
     <Icon className={className} viewBox={DISCORD_VIEW_BOX}>
       <path
