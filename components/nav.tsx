@@ -66,12 +66,13 @@ const Navigation: FC<{ blog: Blog }> = ({ blog }) => {
         <div
           className={classnames("navbar-menu", {
             "is-active": expanded,
+            "is-collapsed": !expanded,
           })}
         >
           <div className="navbar-end">
             <Links blog={blog} />
 
-            <hr className="is-hidden-touch" />
+            <hr className="is-hidden-mobile" />
 
             <SocialLinks />
           </div>
