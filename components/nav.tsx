@@ -66,7 +66,6 @@ const Navigation: FC<{ blog: Blog }> = ({ blog }) => {
         <div
           className={classnames("navbar-menu", {
             "is-active": expanded,
-            "is-collapsed": !expanded,
           })}
         >
           <div className="navbar-end">

@@ -114,17 +114,15 @@ $footer-color: white;
       z-index: -1;
   
       position: absolute;
+      bottom: 0;
       left: 0;
       right: 0;
-    }
-    .navbar-menu.is-collapsed {
-      transform: translateY(-100%);
+
       transition: transform .2s ease-in-out;
-      pointer-events: none;
     }
     .navbar-menu.is-active {
       opacity: 1;
-      transform: translateY(0%);
+      transform: translateY(100%);
       transition: transform .2s ease-in-out;
       pointer-events: auto;
     }
