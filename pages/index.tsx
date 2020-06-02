@@ -5,7 +5,7 @@ import Layout from "../components/layout";
 import Footer from "../components/footer";
 import Libs from "../components/libs";
 import Logos from "../components/logos";
-import Stack from "../components/stack";
+import TokioStack from "../components/tokio-stack";
 import * as api from "../lib/api";
 
 export default function Home({ app }) {
@@ -15,7 +15,7 @@ export default function Home({ app }) {
         <Hero />
         <Logos />
         <Libs />
-        <Stack />
+        <TokioStack />
       </div>
       <Footer />
     </Layout>
