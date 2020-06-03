@@ -1,4 +1,4 @@
-import React, { FC, useCallback, useState } from "react";
+import React, { FC, useCallback, useEffect, useRef, useState } from "react";
 
 type Id =
   | "tokio"
@@ -18,7 +18,9 @@ type Library = {
   href?: string;
 };
 
-const LIBS = new Map()
+// Maps keep insertion order. We rely on this when iterating over values
+// to render MenuItems and TokioLibs.
+const LIBS: Map<Id, Library> = new Map()
   .set("tokio", {
     id: "tokio",
     name: "The Stack",
@@ -75,51 +77,74 @@ const LIBS = new Map()
     href: "https://github.com/tokio-rs/bytes",
   });
 
-type NavItemProps = {
+type MenuItemProps = {
   lib: Library;
   current: Id;
   onClick(id: Id): void;
 };
 
-const NavItem: FC<NavItemProps> = ({ lib, current, onClick }) => {
-  return (
-    <li className={`tk-lib-${lib.id} ${current === lib.id ? "is-active" : ""}`}>
-      <a href={`#${lib.id}`} onClick={() => onClick(lib.id)}>
-        {lib.short || lib.name}
-      </a>
-    </li>
-  );
-};
+const MenuItem: FC<MenuItemProps> = ({ lib, current, onClick }) => (
+  <li className={`tk-lib-${lib.id} ${current === lib.id ? "is-active" : ""}`}>
+    <a
+      href={`#${lib.id}`}
+      onClick={(e) => {
+        e.preventDefault();
+        onClick(lib.id);
+      }}
+    >
+      {lib.short || lib.name}
+    </a>
+  </li>
+);
 
 type MenuProps = {
   current: Id;
   onClick(id: Id): void;
 };
 
-const Menu: FC<MenuProps> = ({ current, onClick }) => {
-  return (
-    <div className="column is-1 tk-menu is-hidden-touch">
-      <div className="container anchor">
-        <aside className="menu">
-          <ul className="menu-list">
-            {Array.from(LIBS.values()).map((lib) => (
-              <NavItem
-                key={lib.id}
-                lib={lib}
-                current={current}
-                onClick={onClick}
-              />
-            ))}
-          </ul>
-        </aside>
-      </div>
+const Menu: FC<MenuProps> = ({ current, onClick }) => (
+  <div className="column is-1 tk-menu is-hidden-touch">
+    <div className="container anchor">
+      <aside className="menu">
+        <ul className="menu-list">
+          {Array.from(LIBS.values()).map((lib) => (
+            <MenuItem
+              key={lib.id}
+              lib={lib}
+              current={current}
+              onClick={onClick}
+            />
+          ))}
+        </ul>
+      </aside>
     </div>
-  );
+  </div>
+);
+
+type TokioLibProps = {
+  lib: Library;
+  navigate(id: Id): void;
 };
 
-const TokioLib: FC<{ lib: Library }> = ({ lib }) => {
+const TokioLib: FC<TokioLibProps> = ({ lib, navigate }) => {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const rect = ref.current.getBoundingClientRect();
+
+      // TODO: tweak 'magic' boundaries
+      if (rect.top < 200 && rect.top > 0) {
+        navigate(lib.id);
+      }
+    };
+
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <div className="card">
+    <div className="card" ref={ref}>
       <div className={`card-content tk-lib-${lib.id}`}>
         <div className="media">
           <div className="media-content">
@@ -146,60 +171,58 @@ const TokioLib: FC<{ lib: Library }> = ({ lib }) => {
   );
 };
 
-type ImageProps = {
-  id: Id;
-  current: Id;
-};
+const StackImage: FC<{ id: Id; current: Id }> = ({ id, current }) => (
+  <img
+    className={`${
+      id === current || current === "tokio" ? "tk-stack-active" : ""
+    }`}
+    alt={id}
+    src={`/img/stack-${id}.svg`}
+  />
+);
 
-const StackImage: FC<ImageProps> = ({ id, current }) => {
-  return (
-    <img
-      className={`${
-        id === current || current === "tokio" ? "tk-stack-active" : ""
-      }`}
-      alt={id}
-      src={`/img/stack-${id}.svg`}
-    />
-  );
-};
+const StackImages: FC<{ current: Id }> = ({ current }) => (
+  <div className="column is-half is-hidden-mobile">
+    <div className="container anchor">
+      <img
+        className={`${current === "tracing" ? "tk-stack-active" : ""}`}
+        src="/img/stack-lines.svg"
+        alt="tracing outline"
+      />
 
-const StackImages: FC<{ current: Id }> = ({ current }) => {
-  return (
-    <div className="column is-half is-hidden-mobile">
-      <div className="container anchor">
-        <img
-          id="tk-stack-lines"
-          data-stack-id="lines"
-          className={`${current === "tracing" ? "tk-stack-active" : ""}`}
-          src="/img/stack-lines.svg"
-          alt={"lines"}
-        />
-
-        <StackImage id="tracing" current={current} />
-        <StackImage id="bytes" current={current} />
-        <StackImage id="mio" current={current} />
-        <StackImage id="runtime" current={current} />
-        <StackImage id="hyper" current={current} />
-        <StackImage id="tonic" current={current} />
-        <StackImage id="tower" current={current} />
-      </div>
+      <StackImage id="tracing" current={current} />
+      <StackImage id="bytes" current={current} />
+      <StackImage id="mio" current={current} />
+      <StackImage id="runtime" current={current} />
+      <StackImage id="hyper" current={current} />
+      <StackImage id="tonic" current={current} />
+      <StackImage id="tower" current={current} />
     </div>
-  );
-};
+  </div>
+);
 
 const TokioStack: FC = () => {
   const [currentId, setCurrentId] = useState<Id>("tokio");
-  const handleClick = useCallback((id: Id) => setCurrentId(id), []);
+
+  useEffect(() => {
+    let current = window.location.hash.substr(1) || "tokio";
+    setCurrentId(current as Id);
+  }, []);
+
+  const navigate = useCallback(async (id: Id) => {
+    window.location.hash = id;
+    setCurrentId(id);
+  }, []);
 
   return (
     <section className="tk-stack">
       <div className="container">
         <div className="columns">
-          <Menu current={currentId} onClick={handleClick} />
+          <Menu current={currentId} onClick={navigate} />
 
           <div className="column is-5-desktop is-half-tablet tk-libs">
             {Array.from(LIBS.values()).map((lib) => (
-              <TokioLib key={lib.id} lib={lib} />
+              <TokioLib key={lib.id} lib={lib} navigate={navigate} />
             ))}
           </div>
 
