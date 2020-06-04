@@ -222,7 +222,7 @@ const TokioStack: FC = () => {
 
           <div className="column is-5-desktop is-half-tablet tk-libs">
             {Array.from(LIBS.values()).map((lib) => (
-              <TokioLib key={lib.id} lib={lib} navigate={navigate} />
+              <TokioLib key={lib.id} lib={lib} navigate={setCurrentId} />
             ))}
           </div>
 
