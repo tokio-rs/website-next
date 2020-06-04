@@ -35,6 +35,7 @@ const LIBS: Map<Id, Library> = new Map()
     name: "Runtime",
     desc:
       "Including I/O, timer, filesystem, synchronization, and scheduling facilities, the Tokio runtime is the foundation of asynchronous applications.",
+    href: "/tokio",
   })
   .set("hyper", {
     id: "hyper",
@@ -118,8 +119,7 @@ const TokioLib: FC<TokioLibProps> = ({ lib, navigate }) => {
     const onScroll = () => {
       const rect = ref.current.getBoundingClientRect();
 
-      // TODO: tweak 'magic' boundaries
-      if (rect.top < 200 && rect.top > 0) {
+      if (rect.top < 600 && rect.top > 0) {
         navigate(lib.id);
       }
     };
