@@ -1,4 +1,6 @@
-import React, { FC, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/router";
+import React, { FC, useEffect, useRef, useState } from "react";
 
 type Id =
   | "tokio"
@@ -80,40 +82,23 @@ const LIBS: Map<Id, Library> = new Map()
 type MenuItemProps = {
   lib: Library;
   current: Id;
-  onClick(id: Id): void;
 };
 
-const MenuItem: FC<MenuItemProps> = ({ lib, current, onClick }) => (
+const MenuItem: FC<MenuItemProps> = ({ lib, current }) => (
   <li className={`tk-lib-${lib.id} ${current === lib.id ? "is-active" : ""}`}>
-    <a
-      href={`#${lib.id}`}
-      onClick={(e) => {
-        e.preventDefault();
-        onClick(lib.id);
-      }}
-    >
-      {lib.short || lib.name}
-    </a>
+    <Link href={`#${lib.id}`}>
+      <a>{lib.short || lib.name}</a>
+    </Link>
   </li>
 );
 
-type MenuProps = {
-  current: Id;
-  onClick(id: Id): void;
-};
-
-const Menu: FC<MenuProps> = ({ current, onClick }) => (
+const Menu: FC<{ current: Id }> = ({ current }) => (
   <div className="column is-1 tk-menu is-hidden-touch">
     <div className="container anchor">
       <aside className="menu">
         <ul className="menu-list">
           {Array.from(LIBS.values()).map((lib) => (
-            <MenuItem
-              key={lib.id}
-              lib={lib}
-              current={current}
-              onClick={onClick}
-            />
+            <MenuItem key={lib.id} lib={lib} current={current} />
           ))}
         </ul>
       </aside>
@@ -203,22 +188,17 @@ const StackImages: FC<{ current: Id }> = ({ current }) => (
 
 const TokioStack: FC = () => {
   const [currentId, setCurrentId] = useState<Id>("tokio");
+  const router = useRouter();
 
   useEffect(() => {
-    let current = window.location.hash.substr(1) || "tokio";
-    setCurrentId(current as Id);
-  }, []);
-
-  const navigate = useCallback(async (id: Id) => {
-    window.location.hash = id;
-    setCurrentId(id);
+    setCurrentId(router.asPath.substr(2) as Id);
   }, []);
 
   return (
     <section className="tk-stack">
       <div className="container">
         <div className="columns">
-          <Menu current={currentId} onClick={navigate} />
+          <Menu current={currentId} />
 
           <div className="column is-5-desktop is-half-tablet tk-libs">
             {Array.from(LIBS.values()).map((lib) => (
