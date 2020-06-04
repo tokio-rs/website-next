@@ -113,8 +113,8 @@ export default function Content({ menu, href, title, next, prev, body }) {
                 </ul>
               </aside>
             </div>
+            <Footer next={next} prev={prev} />
           </section>
-          <Footer next={next} prev={prev} />
         </div>
       </div>
     </>
