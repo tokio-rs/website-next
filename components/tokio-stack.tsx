@@ -150,6 +150,11 @@ const TokioLib: FC<TokioLibProps> = ({ lib, navigate }) => {
         </div>
         <div className="content">
           <h2 className="subtitle">{lib.desc}</h2>
+          {lib.href && (
+            <p className="learn-more has-text-right">
+              <a href={lib.href}>Learn more ➔</a>
+            </p>
+          )}
         </div>
       </div>
     </div>
