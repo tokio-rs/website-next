@@ -196,7 +196,7 @@ const TokioStack: FC = () => {
   const router = useRouter();
 
   useEffect(() => {
-    setCurrentId(router.asPath.substr(2) as Id);
+    setCurrentId((router.asPath.substr(2) as Id) || "tokio");
   }, []);
 
   return (
