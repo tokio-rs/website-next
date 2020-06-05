@@ -1,7 +1,9 @@
 import Menu from "../components/menu";
 import { DiscordIcon, GitHubIcon } from "./icons";
+import React from "react";
 import ReactMarkdown from "react-markdown/with-html";
 import SyntaxHighlighter from "react-syntax-highlighter";
+import GithubSlugger from 'github-slugger';
 
 const CodeBlock = ({ language, value }) => {
   return (
@@ -10,6 +12,19 @@ const CodeBlock = ({ language, value }) => {
     </SyntaxHighlighter>
   );
 };
+
+function Heading(slugger, props) {
+  let children = React.Children.toArray(props.children)
+  let text = children.reduce(flatten, '')
+  let slug = slugger.slug(text);
+  return React.createElement('h' + props.level, {id: slug}, props.children)
+}
+
+function flatten(text, child) {
+  return typeof child === 'string'
+    ? text + child
+    : React.Children.toArray(child.props.children).reduce(flatten, text)
+}
 
 function Footer({ next, prev }) {
   return (
@@ -65,6 +80,11 @@ function Footer({ next, prev }) {
 }
 
 export default function Content({ menu, href, title, next, prev, body }) {
+  const slugger = new GithubSlugger();
+  const HeadingRenderer = (props) => {
+    return Heading(slugger, props);
+  };
+
   return (
     <>
       <div className="columns is-marginless tk-docs">
@@ -79,7 +99,7 @@ export default function Content({ menu, href, title, next, prev, body }) {
                 <ReactMarkdown
                   escapeHtml={false}
                   source={body}
-                  renderers={{ code: CodeBlock }}
+                  renderers={{ code: CodeBlock, heading: HeadingRenderer }}
                 />
               </div>
               <aside className="column is-one-third tk-content-summary">
