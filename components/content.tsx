@@ -13,10 +13,11 @@ const CodeBlock = ({ language, value }) => {
   );
 };
 
-function Heading(slugger, props) {
+function Heading(slugger, headings, props) {
   let children = React.Children.toArray(props.children)
   let text = children.reduce(flatten, '')
   let slug = slugger.slug(text);
+  headings.push({ level: props.level, title: text, slug });
   return React.createElement('h' + props.level, {id: slug}, props.children)
 }
 
@@ -79,10 +80,89 @@ function Footer({ next, prev }) {
   );
 }
 
+function insertHeading(heading, menu, level = 1) {
+  if (level == heading.level || menu.length == 0) {
+    menu.push({
+      heading,
+      nested: [],
+    });
+  } else {
+    insertHeading(heading, menu[menu.length - 1].nested, level + 1);
+  }
+}
+
+function TableOfContents({ headings }) {
+  let menu = [];
+
+  for (const heading of headings) {
+    insertHeading(heading, menu);
+  }
+
+  const list = menu.map((entry) => {
+    const heading = entry.heading;
+
+    let nested = entry.nested.map((entry) => {
+      const heading = entry.heading;
+
+      return (
+      <li key={heading.slug}>
+        <a href={`#${heading.slug}`}>{heading.title}</a>
+      </li>
+      );
+    });
+
+    return (
+      <li key={heading.slug}>
+        <a href={`#${heading.slug}`}>{heading.title}</a>
+        {entry.nested.length > 0 && (
+          <ul>
+            {nested}
+          </ul>
+        )}
+      </li>
+    )
+  });
+
+  return (
+    <aside className="column is-one-third tk-content-summary">
+    <ul className="tk-content-summary-menu">
+      {list}
+      {/* <li>
+        <a href="#">Motivation</a>
+      </li>
+      <li>
+        <a href="#">Using tokio compat</a>
+        <ul>
+          <li>
+            <a href="#">Getting Started</a>
+          </li>
+          <li>
+            <a href="#">Notes</a>
+          </li>
+          <li>
+            <a href="#">
+              hello world this is a long item that will wrap some
+              and that is OK
+            </a>
+          </li>
+        </ul>
+      </li>
+      <li>
+        <a href="#">Case Study: Vector</a>
+      </li>
+      <li>
+        <a href="#">Conclusion</a>
+      </li> */}
+    </ul>
+  </aside>
+  );
+}
+
 export default function Content({ menu, href, title, next, prev, body }) {
   const slugger = new GithubSlugger();
+  let headings = [{level: 1, title, slug: "" }];
   const HeadingRenderer = (props) => {
-    return Heading(slugger, props);
+    return Heading(slugger, headings, props);
   };
 
   return (
@@ -102,36 +182,7 @@ export default function Content({ menu, href, title, next, prev, body }) {
                   renderers={{ code: CodeBlock, heading: HeadingRenderer }}
                 />
               </div>
-              <aside className="column is-one-third tk-content-summary">
-                <ul className="tk-content-summary-menu">
-                  <li>
-                    <a href="#">Motivation</a>
-                  </li>
-                  <li>
-                    <a href="#">Using tokio compat</a>
-                    <ul>
-                      <li>
-                        <a href="#">Getting Started</a>
-                      </li>
-                      <li>
-                        <a href="#">Notes</a>
-                      </li>
-                      <li>
-                        <a href="#">
-                          hello world this is a long item that will wrap some
-                          and that is OK
-                        </a>
-                      </li>
-                    </ul>
-                  </li>
-                  <li>
-                    <a href="#">Case Study: Vector</a>
-                  </li>
-                  <li>
-                    <a href="#">Conclusion</a>
-                  </li>
-                </ul>
-              </aside>
+              <TableOfContents headings={headings}/>
             </div>
             <Footer next={next} prev={prev} />
           </section>
