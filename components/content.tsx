@@ -3,7 +3,7 @@ import { DiscordIcon, GitHubIcon } from "./icons";
 import React from "react";
 import ReactMarkdown from "react-markdown/with-html";
 import SyntaxHighlighter from "react-syntax-highlighter";
-import GithubSlugger from 'github-slugger';
+import GithubSlugger from "github-slugger";
 
 const CodeBlock = ({ language, value }) => {
   return (
@@ -14,17 +14,17 @@ const CodeBlock = ({ language, value }) => {
 };
 
 function Heading(slugger, headings, props) {
-  let children = React.Children.toArray(props.children)
-  let text = children.reduce(flatten, '')
+  let children = React.Children.toArray(props.children);
+  let text = children.reduce(flatten, "");
   let slug = slugger.slug(text);
   headings.push({ level: props.level, title: text, slug });
-  return React.createElement('h' + props.level, {id: slug}, props.children)
+  return React.createElement("h" + props.level, { id: slug }, props.children);
 }
 
 function flatten(text, child) {
-  return typeof child === 'string'
+  return typeof child === "string"
     ? text + child
-    : React.Children.toArray(child.props.children).reduce(flatten, text)
+    : React.Children.toArray(child.props.children).reduce(flatten, text);
 }
 
 function Footer({ next, prev }) {
@@ -105,29 +105,25 @@ function TableOfContents({ headings }) {
       const heading = entry.heading;
 
       return (
-      <li key={heading.slug}>
-        <a href={`#${heading.slug}`}>{heading.title}</a>
-      </li>
+        <li key={heading.slug}>
+          <a href={`#${heading.slug}`}>{heading.title}</a>
+        </li>
       );
     });
 
     return (
       <li key={heading.slug}>
         <a href={`#${heading.slug}`}>{heading.title}</a>
-        {entry.nested.length > 0 && (
-          <ul>
-            {nested}
-          </ul>
-        )}
+        {entry.nested.length > 0 && <ul>{nested}</ul>}
       </li>
-    )
+    );
   });
 
   return (
     <aside className="column is-one-third tk-content-summary">
-    <ul className="tk-content-summary-menu">
-      {list}
-      {/* <li>
+      <ul className="tk-content-summary-menu">
+        {list}
+        {/* <li>
         <a href="#">Motivation</a>
       </li>
       <li>
@@ -153,14 +149,14 @@ function TableOfContents({ headings }) {
       <li>
         <a href="#">Conclusion</a>
       </li> */}
-    </ul>
-  </aside>
+      </ul>
+    </aside>
   );
 }
 
 export default function Content({ menu, href, title, next, prev, body }) {
   const slugger = new GithubSlugger();
-  let headings = [{level: 1, title, slug: "" }];
+  let headings = [{ level: 1, title, slug: "" }];
   const HeadingRenderer = (props) => {
     return Heading(slugger, headings, props);
   };
@@ -182,7 +178,7 @@ export default function Content({ menu, href, title, next, prev, body }) {
                   renderers={{ code: CodeBlock, heading: HeadingRenderer }}
                 />
               </div>
-              <TableOfContents headings={headings}/>
+              <TableOfContents headings={headings} />
             </div>
             <Footer next={next} prev={prev} />
           </section>

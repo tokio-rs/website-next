@@ -9,7 +9,7 @@ const menu = {
         nested: ["reliable", "fast", "easy", "flexible"],
       },
       "getting-started": {
-        nested: ["hello-world", "cargo-dependencies", "echo"],
+        nested: [],
       },
       topics: {
         nested: ["concurrency"],
