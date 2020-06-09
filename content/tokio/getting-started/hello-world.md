@@ -6,7 +6,7 @@ We will get started by writing a very basic Tokio application. It will connect
 to the Mini-Redis server, set the value of the key `hello` to `world`. It will
 then read back the key. This will be done using the Mini-Redis client library.
 
-# Writing the code
+# The code
 
 ## Generate a new crate
 
@@ -64,3 +64,29 @@ got value from the server; success=Some(b"world")
 ```
 
 Success!
+
+# Breaking it down
+
+Let's take some time to go over what we just did. There isn't much code, but a
+lot is happening.
+
+```rust
+let mut client = client::connect("127.0.0.1:6379").await?;
+```
+
+The `client::connect` function is provided by the `mini-redis` crate. It
+asynchronously establishes a TCP connection with the specified remote address.
+Once the connection is established, a `client` handle is returned. Even though
+the operation is performed asynchronously, the code we write **looks**
+synchronous. The only indication that the operation is asynchronous is the
+`.await` operator.
+
+## Compile-time green-threading
+
+Rust implements asynchronous programing using feature called [`async/await`].
+
+[[warning]] | Note that, while other languages implement [`async/await`], Rust
+takes a unique | approach. Specifically, Rust's async operations are **lazy**.
+This results in | different runtime semantics.
+
+[`async/await`]: https://en.wikipedia.org/wiki/Async/await

@@ -4,6 +4,7 @@ import React from "react";
 import ReactMarkdown from "react-markdown/with-html";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import GithubSlugger from "github-slugger";
+import CustomBlocks from "remark-custom-blocks";
 
 const CodeBlock = ({ language, value }) => {
   return (
@@ -13,12 +14,28 @@ const CodeBlock = ({ language, value }) => {
   );
 };
 
+const Blocks = {
+  warning: {},
+};
+
 function Heading(slugger, headings, props) {
   let children = React.Children.toArray(props.children);
   let text = children.reduce(flatten, "");
   let slug = slugger.slug(text);
   headings.push({ level: props.level, title: text, slug });
   return React.createElement("h" + props.level, { id: slug }, props.children);
+}
+
+function Block({ children }) {
+  return children;
+}
+
+function BlockBody({ children }) {
+  return (
+    <blockquote className="notification is-warning is-light">
+      {children}
+    </blockquote>
+  );
 }
 
 function flatten(text, child) {
@@ -147,7 +164,13 @@ export default function Content({ menu, href, title, next, prev, body }) {
                 <ReactMarkdown
                   escapeHtml={false}
                   source={body}
-                  renderers={{ code: CodeBlock, heading: HeadingRenderer }}
+                  renderers={{
+                    code: CodeBlock,
+                    heading: HeadingRenderer,
+                    warningCustomBlock: Block,
+                    warningCustomBlockBody: BlockBody,
+                  }}
+                  plugins={[[CustomBlocks, Blocks]]}
                 />
                 <Footer next={next} prev={prev} />
               </div>
