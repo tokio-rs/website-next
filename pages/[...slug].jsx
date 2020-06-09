@@ -9,10 +9,10 @@ const menu = {
         nested: ["reliable", "fast", "easy", "flexible"],
       },
       "getting-started": {
-        nested: [],
+        nested: ["hello-world"],
       },
       topics: {
-        nested: ["concurrency"],
+        nested: ["concurrency", "features"],
       },
       glossary: {},
       api: {

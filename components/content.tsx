@@ -121,35 +121,7 @@ function TableOfContents({ headings }) {
 
   return (
     <aside className="column is-one-third tk-content-summary">
-      <ul className="tk-content-summary-menu">
-        {list}
-        {/* <li>
-        <a href="#">Motivation</a>
-      </li>
-      <li>
-        <a href="#">Using tokio compat</a>
-        <ul>
-          <li>
-            <a href="#">Getting Started</a>
-          </li>
-          <li>
-            <a href="#">Notes</a>
-          </li>
-          <li>
-            <a href="#">
-              hello world this is a long item that will wrap some
-              and that is OK
-            </a>
-          </li>
-        </ul>
-      </li>
-      <li>
-        <a href="#">Case Study: Vector</a>
-      </li>
-      <li>
-        <a href="#">Conclusion</a>
-      </li> */}
-      </ul>
+      <ul className="tk-content-summary-menu">{list}</ul>
     </aside>
   );
 }
@@ -177,10 +149,10 @@ export default function Content({ menu, href, title, next, prev, body }) {
                   source={body}
                   renderers={{ code: CodeBlock, heading: HeadingRenderer }}
                 />
+                <Footer next={next} prev={prev} />
               </div>
               <TableOfContents headings={headings} />
             </div>
-            <Footer next={next} prev={prev} />
           </section>
         </div>
       </div>

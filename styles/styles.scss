@@ -653,11 +653,18 @@ $footer-color: white;
       max-width: 1220px;
     }
 
-    .tk-content-summary {
-      @media screen and (max-width: 1100px) {
+    @media screen and (max-width: 1100px) {
+      .tk-content-summary {
         display: none;
       }
 
+      .tk-markdown {
+        flex: none;
+        width: 100%;
+      }
+    }
+
+    .tk-content-summary {
       font-size: 0.9rem;
 
       a {
