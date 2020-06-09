@@ -85,8 +85,9 @@ synchronous. The only indication that the operation is asynchronous is the
 
 Rust implements asynchronous programing using feature called [`async/await`].
 
-[[warning]] | Note that, while other languages implement [`async/await`], Rust
-takes a unique | approach. Specifically, Rust's async operations are **lazy**.
-This results in | different runtime semantics.
+[[warning]]
+| Note that, while other languages implement [`async/await`], Rust takes a unique
+| approach. Specifically, Rust's async operations are **lazy**. This results in
+| different runtime semantics.
 
 [`async/await`]: https://en.wikipedia.org/wiki/Async/await
