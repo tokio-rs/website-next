@@ -97,7 +97,7 @@ processing from where it left off. Our example from before only has one task, so
 nothing happens while it is suspended, but asynchronous programs typically have
 many such tasks.
 
-While asynchronous programming can result in faster applications, often times it
+Although asynchronous programming can result in faster applications, it often
 results in much more complicated programs. The programmer is required to track
 all the state necessary to resume work once the asynchronous operation
 completes. Historically, this is a tedious and error-prone task.
