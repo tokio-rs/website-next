@@ -80,6 +80,10 @@ $footer-color: white;
   @return color.scale($color, $lightness: -15%);
 }
 
+@function lighten($color) {
+  @return color.scale($color, $lightness: 93%);
+}
+
 .navbar {
   .navbar-brand {
     background-color: black;
@@ -748,6 +752,19 @@ $footer-color: white;
         left: -1.1rem;
         top: -1.15rem;
         font-size: 2.7rem;
+      }
+
+      .is-warning {
+        background: lighten($magenta);
+        color: $magenta;
+
+        strong, code {
+          color: $magenta;
+        }
+      }
+
+      blockquote.is-warning {
+        border-left-color: $magenta;
       }
     }
 

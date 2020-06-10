@@ -1,4 +1,5 @@
 import Menu from "../components/menu";
+import classnames from "classnames";
 import { DiscordIcon, GitHubIcon } from "./icons";
 import React from "react";
 import ReactMarkdown from "react-markdown/with-html";
@@ -15,7 +16,12 @@ const CodeBlock = ({ language, value }) => {
 };
 
 const Blocks = {
-  warning: {},
+  warning: {
+    classes: "is-warning",
+  },
+  info: {
+    classes: "is-info",
+  },
 };
 
 function Heading(slugger, headings, props) {
@@ -26,16 +32,16 @@ function Heading(slugger, headings, props) {
   return React.createElement("h" + props.level, { id: slug }, props.children);
 }
 
-function Block({ children }) {
-  return children;
-}
-
-function BlockBody({ children }) {
+function Block({ children, data: { hProperties: { className } } }) {
   return (
-    <blockquote className="notification is-warning is-light">
+    <blockquote className={classnames(...className)}>
       {children}
     </blockquote>
-  );
+  )
+}
+
+function BlockBody({children}) {
+  return children;
 }
 
 function flatten(text, child) {
@@ -169,6 +175,8 @@ export default function Content({ menu, href, title, next, prev, body }) {
                     heading: HeadingRenderer,
                     warningCustomBlock: Block,
                     warningCustomBlockBody: BlockBody,
+                    infoCustomBlock: Block,
+                    infoCustomBlockBody: BlockBody,
                   }}
                   plugins={[[CustomBlocks, Blocks]]}
                 />

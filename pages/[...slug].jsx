@@ -12,7 +12,7 @@ const menu = {
         nested: ["hello-world"],
       },
       topics: {
-        nested: ["concurrency", "features"],
+        nested: ["async", "concurrency", "features"],
       },
       glossary: {},
       api: {
