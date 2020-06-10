@@ -3,9 +3,8 @@ title: "Overview"
 ---
 
 Tokio is a collections of resources that allow developers to write safe, fast
-and reliable asynchronous applications. Leveraging Rust's powerful features,
-Tokio leverages the type system and trait resolution to empower developers to
-push the limits.
+and reliable asynchronous applications. Tokio leverages Rust's powerful type
+system and trait resolution to empower developers to push the limits.
 
 More specifically, Tokio is an event-driven, non-blocking I/O platform for
 writing asynchronous applications with Rust. At a high level, it provides a few
