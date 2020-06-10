@@ -112,6 +112,9 @@ $footer-color: white;
       width: 1.8rem;
     }
   }
+  a, a:hover, a:focus, a:active {
+    outline: none;
+  }
   @include mobile {
     .navbar-menu {
       display: block;

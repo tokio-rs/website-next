@@ -66,9 +66,9 @@ ability to deliver correct code easily is unparalleled.
 # Flexible
 
 Tokio provides multiple variations of the runtime. Everything from a
-[work-stealing] runtime to a runtime that can run tasks that never get sent
-across threads. Each of these runtimes come with many knobs to allow users to
-tune them to their needs.
+multi-threaded, [work-stealing] runtime to a light-weight, single-threaded
+runtime. Each of these runtimes come with many knobs to allow users to tune them
+to their needs.
 
 [work-stealing]: https://en.wikipedia.org/wiki/Work_stealing
 

@@ -171,4 +171,55 @@ The return value of an `async fn` is an anonymous type that implements the
 
 ## Async `main` function
 
-TODO
+The main function used to launch the application differs from the usual Rust crate.
+
+1. It is an `async fn`
+2. It is annotated with `#[tokio::main]`
+
+An `async fn` is used as we want to enter an asynchronous context. However,
+asynchronous functions must be executed by a [runtime]. The runtime contains the
+asynchronous task scheduler, provides evented I/O, timers, etc. The runtime does
+not automatically start, so the main function needs to start it.
+
+The `#[tokio::main]` function is a macro. It transforms the `async fn main()`
+into a synchronous `fn main()` that initializes a runtime instance and executes
+the async main function.
+
+For example, the following:
+
+```rust
+#[tokio::main]
+async fn main() {
+    println!("hello");
+}
+```
+
+gets transformed into:
+
+```rust
+fn main() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        println!("hello");
+    })
+}
+```
+
+The details of the Tokio runtime will be covered later.
+
+[runtime]: https://docs.rs/tokio/0.2.21/tokio/runtime/index.html
+
+## Cargo features
+
+When depending on Tokio for this tutorial, the `full` feature flag is enabled:
+
+```toml
+tokio = { version = "0.2", features = ["full"] }
+```
+
+Tokio has a lot of functionality (tcp, udp, unix sockets, timers, sync
+utilities, multiple scheduler types, ...). Not all applications need all
+functionality. When attempting to optimize compile time or the end application
+footprint, the application can decide to opt into **only** the features it uses.
+
+For now, use the "full" feature when depending on Tokio.
