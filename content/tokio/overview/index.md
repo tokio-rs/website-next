@@ -42,7 +42,7 @@ continue to perform well.
 
 Tokio is built on top of Rust's strong type system and novel trait resolution.
 This enables users to build software with the ability to focus on the task at
-hand instead of worrying if their code will work. Generally, if it compiles it
+hand instead of worrying if their code will work. Generally, if it compiles, it
 will work.
 
 Tokio also contains a very large test suite from integration tests to proper
@@ -60,7 +60,7 @@ and day out.
 
 Tokio follows very closely to the standard libraries naming convention when it
 makes sense. This allows easy conversion between code written with only the
-standard library to code written with tokio. With the strong type system the
+standard library to code written with Tokio. With the strong type system, the
 ability to deliver correct code easily is unparalleled.
 
 # Flexible
