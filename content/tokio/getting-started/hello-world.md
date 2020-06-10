@@ -91,9 +91,11 @@ exchange with a peer over the network takes some amount of time. During this
 time, the thread is blocked.
 
 With asynchronous programming, operations that cannot complete immediately are
-deferred to the background. The program continues running, doing other things.
-Once the operation completes, the program receives the result and continues
-processing from where it left off.
+suspended to the background. The thread is not blocked, and can continue running
+other things. Once the operation completes, the task is unsuspended and continues
+processing from where it left off. Our example from before only has one task, so
+nothing happens while it is suspended, but asynchronous programs typically have
+many such tasks.
 
 While asynchronous programming can result in faster applications, often times it
 results in much more complicated programs. The programmer is required to track
