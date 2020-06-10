@@ -47,8 +47,8 @@ Before getting started, you should make sure that you have the
 [Rust][install-rust] toolchain installed and ready to go. If you don't have it,
 the easiest way to install it is using [rustup].
 
-This tutorial requires a minimum of Rust version `1.39.0`. However, it is
-recommended to have the most recent stable Rust version.
+This tutorial requires a minimum of Rust version `1.39.0`, but the most
+recent stable version of Rust is recommended.
 
 To check that Rust is installed on your computer, run the following:
 
