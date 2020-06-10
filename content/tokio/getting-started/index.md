@@ -9,10 +9,10 @@ Redis commands but will get a comprehensive tour of Tokio.
 
 # Mini-Redis
 
-You can find the full implementation of [Mini-Redis on GitHub][mini-redis]. THe
+You can find the full implementation of [Mini-Redis on GitHub][mini-redis]. The
 source is well commented to aid in reading along. We will also use the
 Mini-Redis server to test our client as we write it. This way, we don't have to
-worry about installing real Redis.
+worry about installing a real Redis server.
 
 # Getting Help
 
