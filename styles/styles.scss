@@ -84,6 +84,13 @@ $footer-color: white;
   @return color.scale($color, $lightness: 93%);
 }
 
+a,
+a:hover,
+a:focus,
+a:active {
+  outline: none;
+}
+
 .navbar {
   .navbar-brand {
     background-color: black;
@@ -112,9 +119,7 @@ $footer-color: white;
       width: 1.8rem;
     }
   }
-  a, a:hover, a:focus, a:active {
-    outline: none;
-  }
+
   @include mobile {
     .navbar-menu {
       display: block;
@@ -761,7 +766,8 @@ $footer-color: white;
         background: lighten($magenta);
         color: $magenta;
 
-        strong, code {
+        strong,
+        code {
           color: $magenta;
         }
       }

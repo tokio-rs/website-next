@@ -32,15 +32,18 @@ function Heading(slugger, headings, props) {
   return React.createElement("h" + props.level, { id: slug }, props.children);
 }
 
-function Block({ children, data: { hProperties: { className } } }) {
+function Block({
+  children,
+  data: {
+    hProperties: { className },
+  },
+}) {
   return (
-    <blockquote className={classnames(...className)}>
-      {children}
-    </blockquote>
-  )
+    <blockquote className={classnames(...className)}>{children}</blockquote>
+  );
 }
 
-function BlockBody({children}) {
+function BlockBody({ children }) {
   return children;
 }
 

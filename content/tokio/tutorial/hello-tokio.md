@@ -13,8 +13,8 @@ then read back the key. This will be done using the Mini-Redis client library.
 Let's start by generating a new Rust app:
 
 ```bash
-$ cargo new hello-redis
-$ cd hello-redis
+$ cargo new my-redis
+$ cd my-redis
 ```
 
 ## Add dependencies
@@ -56,7 +56,7 @@ Make sure the Mini-Redis server is running. In a separate terminal window, run:
 $ mini-redis-server
 ```
 
-Now, run the `hello-redis` application:
+Now, run the `my-redis` application:
 
 ```bash
 $ cargo run
