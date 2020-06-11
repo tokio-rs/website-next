@@ -20,7 +20,7 @@ The first thing our Redis server needs to do is accept inbound TCP sockets. This
 is done with [`tokio::net::TcpListener`][tcpl].
 
 [[info]]
-| Many of Tokio types are named the same as their synchronous equivalent in
+| Many of Tokio's types are named the same as their synchronous equivalent in
 | the Rust standard library. When it makes sense, Tokio exposes the same APIs
 | as `std` but using `async fn`.
 
@@ -38,7 +38,7 @@ async fn main() {
     let mut listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
 
     loop {
-        // The second item is the peer address.
+        // The second item contains the ip and port of the new connection.
         let (socket, _) = listener.accept().await.unwrap();
         process(socket).await;
     }
@@ -46,7 +46,7 @@ async fn main() {
 
 async fn process(socket: TcpStream) {
     // The `Connection` lets us read/write redis **frames** instead of
-    // byte streams.
+    // byte streams. The `Connection` type is defined by mini-redis.
     let mut connection = Connection::new(socket);
 
     if let Some(frame) = connection.read_frame().await.unwrap() {
@@ -84,7 +84,7 @@ In the server terminal, the output is:
 GOT: Array([Bulk(b"set"), Bulk(b"hello"), Bulk(b"world")])
 ```
 
-[tcpl]: https://docs.rs/tokio/0.2.21/tokio/net/struct.TcpListener.html
+[tcpl]: https://docs.rs/tokio/0.2/tokio/net/struct.TcpListener.html
 
 # Concurrency
 
@@ -98,7 +98,7 @@ need to add some concurrency.
 
 [[info]]
 | Concurrency does not mean parallism. Because Tokio is asynchronous, many
-| requests may be processed concurrently on a single thread.
+| requests can be processed concurrently on a single thread.
 
 To process connections concurrently, a new task is spawned for each inbound
 connection. The connection is processed on this task.
@@ -125,8 +125,9 @@ async fn main() {
 
 A Tokio task is an asynchronous green thread. Tasks are the unit of execution
 managed by the scheduler. Spawning the task submits the task to the Tokio
-scheduler. The scheduler then ensures the task executes when it has work
-to be done. In our case, this happens when the socket has data to read.
+scheduler, which then ensures that the task executes when it has work to do. In
+our case, this happens when data arrives on the socket from the remote
+connection, or when the remote connection is ready to accept our response.
 
 Tasks in Tokio are very lightweight. Under the hood, they require only a single
 allocation and 64 bytes of memory. Applications should feel free to spawn
