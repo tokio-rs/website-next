@@ -8,8 +8,8 @@ const menu = {
       overview: {
         nested: ["reliable", "fast", "easy", "flexible"],
       },
-      "getting-started": {
-        nested: ["hello-world"],
+      tutorial: {
+        nested: ["hello-tokio", "spawning"],
       },
       topics: {
         nested: ["async", "concurrency", "features"],

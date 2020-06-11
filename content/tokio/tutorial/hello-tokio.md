@@ -1,5 +1,5 @@
 ---
-title: "Hello Redis"
+title: "Hello Tokio"
 ---
 
 We will get started by writing a very basic Tokio application. It will connect
