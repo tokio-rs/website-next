@@ -124,10 +124,10 @@ async fn main() {
 ## Tasks
 
 A Tokio task is an asynchronous green thread. They are created by passing an
-`async` block to `tokio::spawn`. `tokio::spawn` returns a `JoinHandle` which the
-caller may use to interact with the spawned task. The `async` block may have a
-return value. The caller may obtain the return value using `.await` on the
-`JoinHandle`.
+`async` block to `tokio::spawn`. The `tokio::spawn` function returns a
+`JoinHandle`, which the caller may use to interact with the spawned task. The
+`async` block may have a return value. The caller may obtain the return value
+using `.await` on the `JoinHandle`.
 
 For example:
 
@@ -146,15 +146,16 @@ async fn main() {
 }
 ```
 
-Awaiting on `JoinHandle` returns a `Result`. `Err` is returned when the task
-encounters an error during execution and is unable to complete. TA task is
-unable to complete when it panics or when it is forcefully canceled by the
-runtime.
+Awaiting on `JoinHandle` returns a `Result`. When a task encounters an error
+during execution, the `JoinHandle` will return an `Err`. This happens when the
+task either panics, or if the task is forcefully cancelled by the runtime
+shutting down.
 
 Tasks are the unit of execution managed by the scheduler. Spawning the task
 submits it to the Tokio scheduler, which then ensures that the task executes
-when it has work to do. They may be executed on the same thread as the spawner
-or on a different runtime thread.
+when it has work to do. The spawned task may be executed on the same thread
+as where it was spawned, or it may execute on a different runtime thread. The
+task can also be moved between threads after being spawned.
 
 Tasks in Tokio are very lightweight. Under the hood, they require only a single
 allocation and 64 bytes of memory. Applications should feel free to spawn
@@ -162,9 +163,10 @@ thousands, if not millions of tasks.
 
 # Store values
 
-We will now implement the `process` function to handle. We will use a `HashMap`
-to store values. `SET` commands will insert into the `HashMap` and `GET` values
-will load them. We will also process more than one command per socket.
+We will now implement the `process` function to handle incoming commands. We
+will use a `HashMap` to store values. `SET` commands will insert into the
+`HashMap` and `GET` values will load them. Additionally, we will use a loop to
+accept more than one command per connection.
 
 ```rust
 async fn process(socket: TcpStream) {
@@ -178,6 +180,7 @@ async fn process(socket: TcpStream) {
     // the socket
     let mut connection = Connection::new(socket);
 
+    // Use `read_frame` to receive a command from the connection.
     while let Some(frame) = connection.read_frame().await.unwrap() {
         let response = match Command::from_frame(frame).unwrap() {
             Set(cmd) => {
@@ -218,8 +221,8 @@ Now, the output will be:
 got value from the server; success=Some(b"world")
 ```
 
-We now have key values set. However, there is a problem. The value is not
-persisted **between** sockets. If a separate socket connects and tries to GET
-the `hello` key, nothing will be found.
+We can now get and set values, but there is a problem: The values are not
+shared between connections. If another socket connects and tries to `GET`
+the `hello` key, it will not find anything.
 
 In the next section, we will implement persisting data for all sockets.
