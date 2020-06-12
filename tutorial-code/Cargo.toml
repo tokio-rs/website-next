@@ -1,7 +1,0 @@
-[workspace]
-
-members = [
-    "hello-tokio",
-    "spawning",
-    "shared-state",
-]
