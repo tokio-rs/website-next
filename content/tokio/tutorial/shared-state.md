@@ -107,3 +107,43 @@ async fn process(socket: TcpStream, db: Db) {
     }
 }
 ```
+
+# Tasks, threads, and contention
+
+Using a blocking mutex to guard short critical sections is an acceptable
+strategy and contention is minimal. When a lock is contended, the thread
+executing the task must block and wait on the mutex. This will not only block
+the current task but it will also block all other tasks scheduled on the current
+thread.
+
+By default, the Tokio runtime uses a multi-threaded scheduler. Tasks are
+scheduled on any number of threads managed by the runtime. If a large number of
+tasks are scheduled to execute and they all require access to the mutex, then
+there will be contention. On the other hand, if the [`basic_scheduler`][basic]
+is used, then the mutex will never be contended.
+
+If a synchronous mutex contention becomes a problem, the best fix is rarely to
+switch to the Tokio mutex. Instead, options to consider are:
+
+- Switching to a dedicated task to manage state and use message passing.
+- Shard the mutex
+- Restructure the code to avoid the mutex.
+
+In our case, as each *key* is indendent, mutex sharding will work well. To do
+this, instead of having a single `Mutex<HashMap<_, _>>` instance, we would
+introduce `N` distinct instances.
+
+```rust
+type ShardedDb = Arc<Vec<Mutex<HashMap<String, Vec<u8>>>>>;
+```
+
+Then, finding the cell for any given key becomes a two step process. First, the
+key is used to identify which shard it is part of. Then, the key is looked up in
+the `HashMap`.
+
+```rust
+let shard = db[hash(key) % db.len()].lock().unwrap();
+shard.insert(key, value);
+```
+
+[basic]: https://docs.rs/tokio/0.2/tokio/runtime/index.html#basic-scheduler
