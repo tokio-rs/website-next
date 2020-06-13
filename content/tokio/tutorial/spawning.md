@@ -161,6 +161,72 @@ Tasks in Tokio are very lightweight. Under the hood, they require only a single
 allocation and 64 bytes of memory. Applications should feel free to spawn
 thousands, if not millions of tasks.
 
+## `Send` bound
+
+Tasks spawned by `tokio::spawn` **must** implement `Send`. This allows the tasks
+to be moved across threads by the scheduler.
+
+Tasks are `Send` when **all** data that is held **across** `.await` calls are
+`Send`. This is a bit subtle. When `.await` is called, the task yields back to
+the scheduler. The next time the task is executed, it resumes from the point it
+last yielded. To make this work, all state that is used **after** `.await` must
+be saved by the task. If this state is all `Send`, then the task itself is
+`Send`, otherwise, it is not.
+
+For example, this works:
+
+```rust
+use tokio::task::yield_now;
+use std::rc::Rc;
+
+#[tokio::main]
+async fn main() {
+    tokio::spawn(async {
+        let rc = Rc::new("hello");
+        println!("{}", rc);
+
+        // `rc` is no longer used. It is **not** persisted when
+        // the task yields to the scheduler
+        yield_now().await;
+    });
+}
+```
+
+This does not:
+
+```rust
+use tokio::task::yield_now;
+use std::rc::Rc;
+
+#[tokio::main]
+async fn main() {
+    tokio::spawn(async {
+        let rc = Rc::new("hello");
+
+        // `rc` is used after `.await`. It must be persisted to
+        // the task's state.
+        yield_now().await;
+
+        println!("{}", rc);
+    });
+}
+```
+
+Attempting to compile the snippet results in:
+
+```text
+error: future cannot be sent between threads safely
+   --> src/main.rs:6:5
+    |
+6   |     tokio::spawn(async {
+    |     ^^^^^^^^^^^^ future created by async block is not `Send`
+    |
+   ::: /playground/.cargo/registry/src/github.com-1ecc6299db9ec823/tokio-0.2.21/src/task/spawn.rs:127:21
+    |
+127 |         T: Future + Send + 'static,
+    |                     ---- required by this bound in `tokio::task::spawn::spawn`
+```
+
 # Store values
 
 We will now implement the `process` function to handle incoming commands. We
