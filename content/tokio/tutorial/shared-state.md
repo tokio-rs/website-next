@@ -66,9 +66,12 @@ the lock. This, in turn, will block other tasks from processing. H  owever,
 switching to `tokio::sync::Mutex` usually does not help as the asynchronous
 mutex uses a synchronous mutex internally.
 
-As a rule of thumb, using a synchronous mutex from within asynchronous code
-is fine as long as contention remains low and the critical section is kept
-short.
+As a rule of thumb, using a synchronous mutex from within asynchronous code is
+fine as long as contention remains low and the critical section is kept short.
+Additionally, consider using [`parking_lot::Mutex`][parking_lot] as a faster
+alternative to `std::sync::Mutex`.
+
+[parking_lot]: https://docs.rs/parking_lot/0.10.2/parking_lot/type.Mutex.html
 
 # Update `process()`
 
@@ -147,3 +150,24 @@ shard.insert(key, value);
 ```
 
 [basic]: https://docs.rs/tokio/0.2/tokio/runtime/index.html#basic-scheduler
+
+# Holding a `MutexGuard` across an `.await`
+
+If you are using `std::sync::Mutex` and happen to hold a [`MutexGuard`] while
+`.await` is called, you might see an error that looks something like:
+
+```text
+error: future cannot be sent between threads safely
+[...]
+    |     tokio::spawn(async move {
+    |     ^^^^^^^^^^^^ future created by async block is not `Send`
+```
+
+This happens because `std::sync::MutexGuard` is **not** `Send`. Tasks spawned by
+`tokio::spawn` must be `Send` as the work-stealing scheduler may move them
+across threads. Any state that is held between yield points must be persisted by
+the task. The state is used to restore the context when the task is excuted
+next. If `MutexGuard` is held across `.await` points, then the `MutexGuard` must be stored in the task state. Since `MutexGuard` is `!Send`, this makes the task `!Send`.
+
+
+[`MutexGuard`]: https://doc.rust-lang.org/stable/std/sync/struct.MutexGuard.html
