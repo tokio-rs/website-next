@@ -3,7 +3,7 @@ title: "Shared state"
 ---
 
 So far, we have a key-value server working. However, there is a major flaw:
-state is not shared across connections. We will fix that.
+State is not shared across connections. We will fix that in this article.
 
 # Strategies
 
@@ -14,14 +14,14 @@ There are a couple of different ways to share state in Tokio.
 
 Spawning a task to manage state is usually the preferred strategy when
 operations on the data require asynchronous work. This strategy will be used in
-a later section. Right now, the state to share is a `HashMap` and the operation
-are `insert` and `get`. Both of these operations are relatively short, so we
+a later section. Right now, the shared state is a `HashMap` and the operations
+are `insert` and `get`. Both of these operations are near-instant, so we
 will use a `Mutex`.
 
 # Initialize the `HashMap`
 
 The `HashMap` will be shared across many tasks and potentially many threads. To
-support this, it is wrapped with `Arc<Mutex<_>>`.
+support this, it is wrapped in `Arc<Mutex<_>>`.
 
 First, for convenience, add the following after the `use` statements.
 
@@ -114,7 +114,7 @@ async fn process(socket: TcpStream, db: Db) {
 # Tasks, threads, and contention
 
 Using a blocking mutex to guard short critical sections is an acceptable
-strategy and contention is minimal. When a lock is contended, the thread
+strategy when contention is minimal. When a lock is contended, the thread
 executing the task must block and wait on the mutex. This will not only block
 the current task but it will also block all other tasks scheduled on the current
 thread.
@@ -125,8 +125,8 @@ tasks are scheduled to execute and they all require access to the mutex, then
 there will be contention. On the other hand, if the [`basic_scheduler`][basic]
 is used, then the mutex will never be contended.
 
-If a synchronous mutex contention becomes a problem, the best fix is rarely to
-switch to the Tokio mutex. Instead, options to consider are:
+If a contention on a synchronous mutex becomes a problem, the best fix is rarely
+to switch to the Tokio mutex. Instead, options to consider are:
 
 - Switching to a dedicated task to manage state and use message passing.
 - Shard the mutex
@@ -153,8 +153,8 @@ shard.insert(key, value);
 
 # Holding a `MutexGuard` across an `.await`
 
-If you are using `std::sync::Mutex` and happen to hold a [`MutexGuard`] while
-`.await` is called, you might see an error that looks something like:
+If you are using `std::sync::Mutex` and use an `.await` while the mutex is
+locked, you will typically see an error like this:
 
 ```text
 error: future cannot be sent between threads safely
@@ -163,11 +163,24 @@ error: future cannot be sent between threads safely
     |     ^^^^^^^^^^^^ future created by async block is not `Send`
 ```
 
-This happens because `std::sync::MutexGuard` is **not** `Send`. Tasks spawned by
-`tokio::spawn` must be `Send` as the work-stealing scheduler may move them
-across threads. Any state that is held between yield points must be persisted by
-the task. The state is used to restore the context when the task is excuted
-next. If `MutexGuard` is held across `.await` points, then the `MutexGuard` must be stored in the task state. Since `MutexGuard` is `!Send`, this makes the task `!Send`.
+This happens because the `std::sync::MutexGuard` type is **not** `Send`. This
+means that you can't send a mutex lock to another thread, and the error happens
+because the Tokio runtime can move a task between threads at every `.await`.
+To avoid this, you should restructure your code such that the mutex lock is not
+in scope when the `.await` is performed.
+
+You should not try to circumvent this issue by spawning the task in a way that
+does not require it to be `Send`, because if Tokio suspends your task at an
+`.await` while the task is holding the lock, some other task may be scheduled to
+run on the same thread, and this other task may also try to lock that mutex,
+which would result in a deadlock as the task waiting to lock the mutex would
+prevent the task holding the mutex from running.
+
+There are generally three approaches to solving this issue:
+
+1. Restructure your code to not hold the lock across the `.await`.
+2. Spawn a task to manage the resource and use message passing to talk to it.
+3. Use Tokio's asynchronous mutex.
 
 
 [`MutexGuard`]: https://doc.rust-lang.org/stable/std/sync/struct.MutexGuard.html

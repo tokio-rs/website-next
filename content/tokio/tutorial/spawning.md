@@ -163,15 +163,17 @@ thousands, if not millions of tasks.
 
 ## `Send` bound
 
-Tasks spawned by `tokio::spawn` **must** implement `Send`. This allows the tasks
-to be moved across threads by the scheduler.
+Tasks spawned by `tokio::spawn` **must** implement `Send`. This allows the Tokio
+runtime to move the tasks between threads while they are suspended at an
+`.await`.
 
-Tasks are `Send` when **all** data that is held **across** `.await` calls are
+Tasks are `Send` when **all** data that is held **across** `.await` calls is
 `Send`. This is a bit subtle. When `.await` is called, the task yields back to
 the scheduler. The next time the task is executed, it resumes from the point it
 last yielded. To make this work, all state that is used **after** `.await` must
-be saved by the task. If this state is all `Send`, then the task itself is
-`Send`, otherwise, it is not.
+be saved by the task. If this state is `Send`, i.e. can be moved across threads,
+then the task itself can be moved across threads. Similarly, if the state is not
+`Send`, then neither is the task.
 
 For example, this works:
 
@@ -220,11 +222,24 @@ error: future cannot be sent between threads safely
     |
 6   |     tokio::spawn(async {
     |     ^^^^^^^^^^^^ future created by async block is not `Send`
-    |
+    | 
    ::: /playground/.cargo/registry/src/github.com-1ecc6299db9ec823/tokio-0.2.21/src/task/spawn.rs:127:21
     |
 127 |         T: Future + Send + 'static,
     |                     ---- required by this bound in `tokio::task::spawn::spawn`
+    |
+    = help: within `impl std::future::Future`, the trait `std::marker::Send` is not implemented for `std::rc::Rc<&str>`
+note: future is not `Send` as this value is used across an await
+   --> src/main.rs:10:9
+    |
+7   |         let rc = Rc::new("hello");
+    |             -- has type `std::rc::Rc<&str>` which is not `Send`
+...
+10  |         yield_now().await;
+    |         ^^^^^^^^^^^^^^^^^ await occurs here, with `rc` maybe used later
+11  |         println!("{}", rc);
+12  |     });
+    |     - `rc` is later dropped here
 ```
 
 # Store values
