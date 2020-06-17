@@ -31,8 +31,11 @@ use std::sync::{Arc, Mutex};
 type Db = Arc<Mutex<HashMap<String, Vec<u8>>>>;
 ```
 
-Then, update the `main` function to initialize the `HashMap` and pass it a
-**handle** to the `process` function.
+Then, update the `main` function to initialize the `HashMap` and pass an `Arc`
+**handle** to the `process` function. Using `Arc` allows the `HashMap` to be
+referenced concurrently from many tasks, potentially running on many threads.
+Throughout Tokio, the term **handle** is used to reference a value that provides
+access to some shared state.
 
 ```rust
 #[tokio::main]
@@ -58,18 +61,18 @@ async fn main() {
 
 Note, `std::sync::Mutex` and **not** `tokio::sync::Mutex` is used to guard the
 `HashMap` a common error is to unconditionally use `tokio::sync::Mutex` from
-within async code. An async mutex is a mutex used to guard **asynchronous
-critical sections**.
+within async code. An async mutex is a mutex that is locked across calls to
+`.await`.
 
 A synchronous mutex will block the current thread when waiting to acquire the
-the lock. This, in turn, will block other tasks from processing. H  owever,
+the lock. This, in turn, will block other tasks from processing. However,
 switching to `tokio::sync::Mutex` usually does not help as the asynchronous
 mutex uses a synchronous mutex internally.
 
 As a rule of thumb, using a synchronous mutex from within asynchronous code is
-fine as long as contention remains low and the critical section is kept short.
-Additionally, consider using [`parking_lot::Mutex`][parking_lot] as a faster
-alternative to `std::sync::Mutex`.
+fine as long as contention remains low and the lock is not held across calls to
+`.await`. Additionally, consider using [`parking_lot::Mutex`][parking_lot] as a
+faster alternative to `std::sync::Mutex`.
 
 [parking_lot]: https://docs.rs/parking_lot/0.10.2/parking_lot/type.Mutex.html
 

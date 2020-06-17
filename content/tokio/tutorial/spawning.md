@@ -184,8 +184,11 @@ use std::rc::Rc;
 #[tokio::main]
 async fn main() {
     tokio::spawn(async {
-        let rc = Rc::new("hello");
-        println!("{}", rc);
+        // The scope forces `rc` to drop before `.await`.
+        {
+            let rc = Rc::new("hello");
+            println!("{}", rc);
+        }
 
         // `rc` is no longer used. It is **not** persisted when
         // the task yields to the scheduler
@@ -223,12 +226,15 @@ error: future cannot be sent between threads safely
 6   |     tokio::spawn(async {
     |     ^^^^^^^^^^^^ future created by async block is not `Send`
     | 
-   ::: /playground/.cargo/registry/src/github.com-1ecc6299db9ec823/tokio-0.2.21/src/task/spawn.rs:127:21
+   ::: [..]spawn.rs:127:21
     |
 127 |         T: Future + Send + 'static,
-    |                     ---- required by this bound in `tokio::task::spawn::spawn`
+    |                     ---- required by this bound in
+    |                          `tokio::task::spawn::spawn`
     |
-    = help: within `impl std::future::Future`, the trait `std::marker::Send` is not implemented for `std::rc::Rc<&str>`
+    = help: within `impl std::future::Future`, the trait
+    |       `std::marker::Send` is not  implemented for
+    |       `std::rc::Rc<&str>`
 note: future is not `Send` as this value is used across an await
    --> src/main.rs:10:9
     |
@@ -236,7 +242,8 @@ note: future is not `Send` as this value is used across an await
     |             -- has type `std::rc::Rc<&str>` which is not `Send`
 ...
 10  |         yield_now().await;
-    |         ^^^^^^^^^^^^^^^^^ await occurs here, with `rc` maybe used later
+    |         ^^^^^^^^^^^^^^^^^ await occurs here, with `rc` maybe
+    |                           used later
 11  |         println!("{}", rc);
 12  |     });
     |     - `rc` is later dropped here
