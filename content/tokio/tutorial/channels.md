@@ -3,7 +3,8 @@ title: "Channels"
 ---
 
 Now that we have learned some about concurrency with Tokio, let's apply this on
-the client side. Say we want to run two concurrent SET requests. We can spawn one task per request. Then the two requests would happen concurrently.
+the client side. Say we want to run two concurrent Redis commands. We can spawn
+one task per command. Then the two commands would happen concurrently.
 
 At first, we might try something like:
 
@@ -15,9 +16,9 @@ async fn main() {
     // Establish a connection to the server
     let mut client = client::connect("127.0.0.1:6379").await.unwrap();
 
-    // Spawn two tasks, each setting a value
+    // Spawn two tasks, one gets a key, the other sets a key
     let t1 = tokio::spawn(async {
-        client.set("hello", "world".into());
+        let res = client.get("hello");
     });
 
     let t2 = tokio::spawn(async {
@@ -30,12 +31,12 @@ async fn main() {
 ```
 
 This does not compile. `client` needs to be moved into the tasks somehow.
-However, `Client` does not implement `Clone`. Additionally, `Client::set`
-require `&mut self`. We could open a connection per task, but that is not ideal.
-We cannot use `std::sync::Mutex` as the critical section is async. We could use
-`tokio::sync::Mutex`, but that would only allow a single in-flight request. If
-the client implements [pipelining], an async mutex results in underutilizing the
-connection.
+However, `Client` does not implement `Clone`. Additionally, `Client::get` and
+`Client::set` require `&mut self`. We could open a connection per task, but that
+is not ideal. We cannot use `std::sync::Mutex` as `.async` would need to be
+called with the lock held. We could use `tokio::sync::Mutex`, but that would
+only allow a single in-flight request. If the client implements [pipelining], an
+async mutex results in underutilizing the connection.
 
 [pipelining]: https://redis.io/topics/pipelining
 
@@ -47,11 +48,11 @@ sends a message to the `client` task. The `client` task issues the request on
 behalf of the sender. The response is then forward to the sender.
 
 Using this strategy, a single connection is established. The task managing
-`client` is able to get mutable access in order to call `set`. Additionally, the
-channel works as a buffer. Operations may be sent to the `client` task while the
-`client` task is busy. Once the `client` task is available to process new
-requests, it pulls the next request from the channel. This can result in better
-throughput.
+`client` is able to get mutable access in order to call `get` and `set`.
+Additionally, the channel works as a buffer. Operations may be sent to the
+`client` task while the `client` task is busy. Once the `client` task is
+available to process new requests, it pulls the next request from the channel.
+This can result in better throughput.
 
 # Tokio's channel primitives
 
@@ -59,8 +60,10 @@ Tokio provides a [number of channels][channels], each surve a different purpose.
 
 - [mpsc]: multi-producer, single-consumer channel. Many values can be sent.
 - [oneshot]: single-producer, single consumer channel. A single value can be sent.
-- [broadcast]: multi-producer, multi-consumer. Many values can be send. Each receiver sees each value.
-- [watch]: multi-producer, multi-consumer. Many values can be sent, but no history is kept. Receivers only see the "most recent value".
+- [broadcast]: multi-producer, multi-consumer. Many values can be send. Each
+  receiver sees each value.
+- [watch]: multi-producer, multi-consumer. Many values can be sent, but no
+  history is kept. Receivers only see the "most recent value".
 
 In this section, we will use [mpsc] and [oneshot]. The others will be used in later sections.
 
@@ -109,5 +112,7 @@ async fn main() {
     t2.await.unwrap();
 }
 ```
+
+We want
 
 ## Backpressure

@@ -9,4 +9,5 @@ publish = false
 
 [dependencies]
 tokio = { version = "0.2", features = ["full"] }
+bytes = "0.5"
 mini-redis = { path = "/home/carllerche/Code/tokio-mini-redis" }
