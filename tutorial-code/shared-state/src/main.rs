@@ -1,7 +1,7 @@
-use tokio::net::{TcpListener, TcpStream};
 use mini_redis::{Connection, Frame};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use tokio::net::{TcpListener, TcpStream};
 
 type Db = Arc<Mutex<HashMap<String, Vec<u8>>>>;
 
@@ -36,7 +36,7 @@ async fn process(socket: TcpStream, db: Db) {
                 let mut db = db.lock().unwrap();
                 db.insert(cmd.key().to_string(), cmd.value().to_vec());
                 Frame::Simple("OK".to_string())
-            }           
+            }
             Get(cmd) => {
                 let db = db.lock().unwrap();
                 if let Some(value) = db.get(cmd.key()) {

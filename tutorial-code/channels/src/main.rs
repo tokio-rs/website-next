@@ -1,5 +1,5 @@
-use tokio::sync::{oneshot, mpsc};
 use mini_redis::client;
+use tokio::sync::{mpsc, oneshot};
 
 /// Multiple different commands are multiplexed over a single channel.
 enum Command {
@@ -30,7 +30,7 @@ async fn main() {
 
         while let Some(cmd) = rx.recv().await {
             match cmd {
-                Command::Get { key, tx }=> {
+                Command::Get { key, tx } => {
                     let res = client.get(&key).await;
                     tx.send(res);
                 }
@@ -62,7 +62,7 @@ async fn main() {
             val: b"bar".to_vec(),
             tx: resp_tx,
         };
-        
+
         // Send the SET request
         tx2.send(cmd).await;
 
