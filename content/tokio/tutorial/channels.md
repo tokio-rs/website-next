@@ -67,8 +67,9 @@ Tokio provides a [number of channels][channels], each serving a different purpos
 - [watch]: multi-producer, multi-consumer. Many values can be sent, but no
   history is kept. Receivers only see the most recent value.
 
-In this section, we will use [mpsc] and [oneshot]. The others will be used in
-later sections. The full code from this section is found [here][full].
+In this section, we will use [mpsc] and [oneshot]. The other types of message
+passing channels are explored in later sections. The full code from this section
+is found [here][full].
 
 [channels]: https://docs.rs/tokio/0.2/tokio/sync/index.html
 [mpsc]: https://docs.rs/tokio/0.2/tokio/sync/mpsc/index.html
@@ -115,7 +116,7 @@ async fn main() {
 }
 ```
 
-The `mpsc` channel is picked to **send** commands to the task managing the redis
+The `mpsc` channel is used to **send** commands to the task managing the redis
 connection. The multi-producer capability allows messages to be sent from many
 tasks. Creating the channel returns two values, a sender and a receiver. The two
 handles are used separately. They may be moved to different tasks.
@@ -147,14 +148,17 @@ async fn main() {
 }
 ```
 
-Both messages are send to the **single** `Receiver` handle. This handle **may
-not** be cloned.
+Both messages are sent to the single `Receiver` handle. It is not possible to
+clone the receiver of an `mpsc` channel.
 
-When all `Sender` handles drop, it is impossible to send more messages into the
-channel. At this point, the **send half** of the channel is closed. The receive
-half is notified of this by receiving `None`. In our case, when `None` is
-received, we shut down the task managing the connection. As no further commands
-are received, the connection to Redis is no longer needed.
+When every `Sender` has gone out of scope or has otherwise been dropped, it is
+no longer possible to send more messages into the channel. At this point, the
+`recv` call on the `Receiver` will return `None`, which means that all senders
+are gone and the channel is closed.
+
+In our case of with a task that manages the redis connection, it knows that it
+can close the Redis connection once the channel is closed, as the connection
+will not be used again.
 
 # Spawn manager task
 
@@ -226,12 +230,11 @@ The final step is to receive the response back from the manager task. The `GET`
 command needs to get the value and the `SET` command needs to know if the
 operation completed successfully.
 
-To pass the response, `oneshot` is used. The `oneshot` channel is a
+To pass the response, an `oneshot` channel is used. The `oneshot` channel is a
 single-producer, single-consumer channel optimized for sending a single value.
 In our case, the single value is the response.
 
-Similar to `mpssc`, `oneshot::channel()` returns separate sender and receiver
-handles.
+Similar to `mpsc`, `oneshot::channel()` returns a sender and receiver handle.
 
 ```rust
 use tokio::sync::oneshot;
@@ -240,13 +243,13 @@ let (tx, rx) = oneshot::channel();
 ```
 
 Unlike `mpsc`, no capacity is specified as the capacity is always one.
-Additionally, neither handles can be cloned.
+Additionally, neither handle can be cloned.
 
-To receive responses from the manager task, before sending a command a `oneshot`
+To receive responses from the manager task, before sending a command, an `oneshot`
 channel is created. The `Sender` half of the channel is included in the command
 to the manager task. The receive half is used to receive the response.
 
-First, update `Command` to include the `Sender`. First convenience, a type alias
+First, update `Command` to include the `Sender`. For convenience, a type alias
 is used to reference the `Sender`.
 
 ```rust
@@ -304,8 +307,7 @@ let t2 = tokio::spawn(async move {
 });
 ```
 
-Finally, update the manager task to send the command response over the `oneshot`
-channel.
+Finally, update the manager task to send the response over the `oneshot` channel.
 
 ```rust
 while let Some(cmd) = rx.recv().await {
@@ -323,11 +325,12 @@ while let Some(cmd) = rx.recv().await {
 ```
 
 Calling `send` on `oneshot::Sender` completes immediately and does **not**
-require an `.async`.
+require an `.async`. This is because `send` on an `oneshot` channel will always
+fail or succeed immediately without any form of waiting.
 
 You can find the entire code [here][full].
 
-# Always set bounds
+# Backpressure and bounded channels
 
 Whenever concurreny or queuing is introduced, it is important to ensure that the
 queueing is bounded and the system will gracefully handle load. Unbounded queues
