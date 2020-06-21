@@ -327,6 +327,51 @@ require an `.async`.
 
 You can find the entire code [here][full].
 
-# Backpressure
+# Always set bounds
+
+Whenever concurreny or queuing is introduced, it is important to ensure that the
+queueing is bounded and the system will gracefully handle load. Unbounded queues
+will eventually fill up all available memory and cause the system to fail in
+unpredictable ways.
+
+Tokio takes care to avoid implicit queuing. A big part of this is the fact that
+async operation are lazy. Consider the following:
+
+```rust
+loop {
+    async_op();
+}
+```
+
+If the asynchronous operation runs eagerly, the loop will repeatedly queue a new
+`async_op` to run without ensuring the previous operation completed. This
+results in implicit unbounded queuing. Callback based systems and **eager**
+future based systems are particularly susceptable to this.
+
+However, with Tokio and asynchronous Rust, the above snippet will **not** result
+in `async_op` running at all. This is because `.await` is never called. If the
+snippet is updated to use `.await`, then the loop waits for the operation to
+complete before starting over.
+
+```rust
+loop {
+    // Will not repeat until `async_op` completes
+    async_op().await;
+}
+```
+
+Concurrency and queuing must be explicitly introduced. Ways to do this include:
+
+* `tokio::spawn`
+* `select!`
+* `join!`
+* `mpsc::channel`
+
+When doing so, take care to ensure total amount of concurrency is bounded. For
+example, when writing a TCP accept loop, ensure that the total number of open
+sockets is bounded. When using `mpsc::channel`, pick a manageable channel
+capacity. Specific bound values will be application specific.
+
+Taking care and picking good bounds is a big part of writing reliable Tokio applications.
 
 [full]: https://github.com/tokio-rs/website-next/blob/master/tutorial-code/channels/src/main.rs
