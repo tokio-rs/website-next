@@ -75,7 +75,7 @@ later sections. The full code from this section is found [here][full].
 [oneshot]: https://docs.rs/tokio/0.2/tokio/sync/oneshot/index.html
 [broadcast]: https://docs.rs/tokio/0.2/tokio/sync/broadcast/index.html
 [watch]: https://docs.rs/tokio/0.2/tokio/sync/watch/index.html
-[full]: https://github.com/tokio-rs/website-next/blob/master/tutorial-code/channels/src/main.rs
+
 
 # Define the message type
 
@@ -269,6 +269,64 @@ enum Command {
 type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
 ```
 
-TODO: reset of the section
+Now, update the tasks issuing the commands to include the `oneshot::Sender`.
+
+```rust
+let t1 = tokio::spawn(async move {
+    let (resp_tx, resp_rx) = oneshot::channel();
+    let cmd = Command::Get {
+        key: "hello".to_string(),
+        resp: resp_tx,
+    };
+
+    // Send the GET request
+    tx.send(cmd).await.unwrap();
+
+    // Await the response
+    let res = resp_rx.await;
+    println!("GOT = {:?}", res);
+});
+
+let t2 = tokio::spawn(async move {
+    let (resp_tx, resp_rx) = oneshot::channel();
+    let cmd = Command::Set {
+        key: "foo".to_string(),
+        val: b"bar".to_vec(),
+        resp: resp_tx,
+    };
+
+    // Send the SET request
+    tx2.send(cmd).await.unwrap();
+
+    // Await the response
+    let res = resp_rx.await;
+    println!("GOT = {:?}", res)
+});
+```
+
+Finally, update the manager task to send the command response over the `oneshot`
+channel.
+
+```rust
+while let Some(cmd) = rx.recv().await {
+    match cmd {
+        Command::Get { key, resp } => {
+            let res = client.get(&key).await;
+            resp.send(res).unwrap();
+        }
+        Command::Set { key, val, resp } => {
+            let res = client.set(&key, val.into()).await;
+            resp.send(res).unwrap();
+        }
+    }
+}
+```
+
+Calling `send` on `oneshot::Sender` completes immediately and does **not**
+require an `.async`.
+
+You can find the entire code [here][full].
 
 # Backpressure
+
+[full]: https://github.com/tokio-rs/website-next/blob/master/tutorial-code/channels/src/main.rs

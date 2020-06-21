@@ -37,7 +37,7 @@ bytes = "0.5"
 
 Then run `cargo install`.
 
-[`bytes`]: https://docs.rs/bytes
+[`bytes`]: https://docs.rs/bytes/0.5/bytes/struct.Bytes.html
 
 # Initialize the `HashMap`
 
