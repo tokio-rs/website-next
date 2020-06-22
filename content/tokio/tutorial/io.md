@@ -292,15 +292,86 @@ async fn main() -> io::Result<()> {
 }
 ```
 
-TODO:
-- Call out imports
-- use allocated vec for buf and not stack array.
-- return 0 means socket closed.
-- note on error handling.
+Let's break it down. First, since the `AsyncRead` and `AsyncWrite` utilities are
+used, the extension traits must be brought into scope.
+
+```rust
+use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
+```
+
+## Allocating a buffer
+
+The strategy is to read some data from the socket into a buffer then write the
+contents of the buffer back to the socket.
+
+```rust
+let mut buf = vec![0; 1024];
+```
+
+A stack buffer is explicitly avoided. Recall from [earlier][send], we noted that
+all task data that lives across calls to `.await` must be stored by the task. In
+this case, `buf` is used across `.await` calls. All task data is stored in a
+single allocation. You can think of it as an `enum` where each variant is the
+data that needs to be stored for a specific call to `.await`.
+
+If the buffer is represented by a stack array, the internal structure for tasks
+spawned per accepted socket might look something like:
+
+```rust
+struct Task {
+    // internal task fields here
+    task: enum {
+        AwaitingRead {
+            socket: TcpStream,
+            buf: [BufferType],
+        },
+        AwaitingWriteAll {
+            socket: TcpStream,
+            buf: [BufferType],
+        }
+
+    }
+}
+```
+
+If a stack array is used as the buffer type, it will be stored *inline* in the
+task structure. This will make the task structure very big. Additionally, buffer
+sizes are often page sized. This will, in turn, make `Task` an awkward size:
+`$page-size + a-few-bytes`.
+
+The compiler optimizes the layout of async blocks further than a basic `enum`.
+In practice, variables are not moved around between variants as would be
+required with an `enum`. However, the task struct size is at least as big as the
+largest variable.
+
+Because of this, it is usually more efficient to use a dedicated allocation for
+the buffer.
+
+## Handling EOF
+
+When the read half of the TCP stream is shutdown, a call to `read()` returns
+`Ok(0)`. It is important to exit the read loop at this point. Forgetting to
+break from the read loop on EOF is a common source of bugs.
+
+```rust
+loop {
+    match socket.read(&mut buf).await {
+        // Return value of `Ok(0)` signifies that the remote has
+        // closed
+        Ok(0) => return,
+        // ... other cases handled here
+    }
+}
+```
+
+Forgetting to break from the read loop usually results in a 100% CPU infinite
+loop situation. As the socket is closed, `socket.read()` returns immediately.
+The loop then repeats forever.
 
 Full code is found [here][full]
 
 [full]: #
+[send]: /tokio/tutorial/spawning#send-bound
 
 [`AsyncRead`]: https://docs.rs/tokio/0.2/tokio/io/trait.AsyncRead.html
 [`AsyncWrite`]: https://docs.rs/tokio/0.2/tokio/io/trait.AsyncWrite.html
