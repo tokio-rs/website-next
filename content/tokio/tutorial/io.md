@@ -2,8 +2,8 @@
 title: "I/O"
 ---
 
-I/O in Tokio operates in much the same way as `std`, but asynchronous. There is
-a trait for reading ([`AsyncRead`]) and a trait for writing ([`AsyncWrite`]).
+I/O in Tokio operates in much the same way as `std`, but asynchronously. There
+is a trait for reading ([`AsyncRead`]) and a trait for writing ([`AsyncWrite`]).
 Specific types implement these traits as appropriate ([`TcpStream`], [`File`],
 [`Stdout`]). [`AsyncRead`] and [`AsyncWrite`] are also implemented by a number
 of data structures, such as `Vec<u8>` and `&[u8]`. This allows using byte arrays
@@ -17,12 +17,18 @@ byte streams. However, unlike `std`, these traits are intended to be
 use utility methods provided by [`AsyncReadExt`] and [`AsyncWriteExt`]. Those
 two traits are where familiar methods are found.
 
-Let's briefly look at a few of these methods.
+Let's briefly look at a few of these methods. All of these functions as `async`
+and must be used with `.await`.
 
 ## `async fn read()`
 
 [`AsyncReadExt::read`][read] provides an async method for reading data into a
 buffer, returning the number of bytes read.
+
+**Note:** when `read()` returns `Ok(0)`, this signifies that the stream is
+closed. Any further calls to `read()` will complete immediately with `Ok(0)`.
+With [`TcpStream`] instances, this signifies that the read half of the socket is
+closed.
 
 ```rust
 use tokio::fs::File;
@@ -118,6 +124,184 @@ let mut file = File::create("foo.txt").await?;
 io::copy(&mut reader, &mut file).await?;
 ```
 
+# Echo server
+
+Let's practice doing some asynchronous I/O. We will be writing an echo server.
+
+The echo server binds a `TcpListener` and accepts inbound connections in a loop.
+For each inbound connection, data is read from the socket and written
+immediately back to the socket. The client sends data to the server and receives
+the exact same data back.
+
+We will implement the echo server twice, using slightly different strategies.
+
+## Using `io::copy()`
+
+To start, we will implement the echo logic using the [`io::copy`][copy] utility.
+
+This is a TCP server and needs an accept loop. A new task is spawned to process
+each accepted socket.
+
+```rust
+use tokio::io;
+use tokio::net::TcpListener;
+
+#[tokio::main]
+async fn main() -> io::Result<()> {
+    let mut listener = TcpListener::bind("127.0.0.1:6142").await.unwrap();
+
+    loop {
+        let (mut socket, _) = listener.accept().await?;
+
+        tokio::spawn(async move {
+            // Copy data here
+        });
+    }
+}
+```
+
+As seen earlier, this utility function takes a reader and a writer and copies
+data from one to the other. However, we only have a single `TcpStream`. This
+single value implements **both** `AsyncRead` and `AsyncWrite`. Because
+`io::copy` requires `&mut` for both the reader and the writer, the socket cannot
+be used for both arguments.
+
+```rust
+// This fails to compile
+io::copy(&mut socket, &mut socket).await
+```
+
+## Splitting a reader + writer
+
+To work around this problem, we must split the socket into a reader handle and a
+writer handle. The best way to split a reader/writer combo depends on the
+specific type.
+
+Any reader + writer type can be split using the [`io::split`][split] utility.
+This function takes a single value and returns separate reader and  writer
+handles. These two handles can be used independently, including from separate
+tasks.
+
+For example, the echo client could handle concurrent reads and writes like this:
+
+```rust
+use tokio::io;
+use tokio::net::TcpStream;
+
+#[tokio::main]
+async fn main() -> io::Result<()> {
+    let socket = TcpStream::connect("127.0.0.1:6142").await?;
+    let (rd, wr) = io::split(socket);
+
+    // Write data in the background
+    let write_task = tokio::spawn(async move {
+        wr.write_all(b"hello\r\n").await?;
+        wr.write_all(b"world\r\n").await?;
+        Ok(())
+    });
+
+    let mut buf = vec![0; 128];
+
+    loop {
+        let n = rd.read(&mut buf).await?;
+
+        if n == 0 {
+            break;
+        }
+
+        println!("GOT {:?}", buf[..n]);
+    }
+
+    Ok(())
+}
+```
+
+Because `io::split` supports **any** value that implements `AsyncRead +
+AsyncWrite` and returns independent handles, internally `io::split` uses an
+`Arc` and a `Mutex`. This overhead can be avoided with `TcpStream`. `TcpStream`
+offers two specialized split functions.
+
+[`TcpStream::split`] takes a **reference** to the stream and returns a reader
+and writer handle. Because a reference is used, both handles must stay on the
+**same** task that `split()` was called from. This specialized `split` is
+zero-cost. There is no `Arc` or `Mutex` needed. `TcpStream` also provides
+[`into_split`] which supports handles that can move across tasks at the cost of
+only an `Arc`.
+
+Because `io::copy()` is called on a the same task that owns the `TcpStream`, we
+can use [`TcpStream::split`]. The task that processes the echo logic becomes:
+
+```rust
+tokio::spawn(async move {
+    let (mut rd, mut wr) = socket.split();
+    
+    if io::copy(&mut rd, &mut wr).await.is_err() {
+        eprintln!("failed to copy");
+    }
+});
+```
+
+You can find the entire code [here][full].
+
+[full]: #
+
+## Manual copying
+
+Now lets look at how we would write the echo server by copying the data
+manually. To do this, we use [`AsyncReadExt::read`][read] and
+[`AsyncWriteExt::write_all`][write_all].
+
+The full echo server is as follows.
+
+```rust
+use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
+
+#[tokio::main]
+async fn main() -> io::Result<()> {
+    let mut listener = TcpListener::bind("127.0.0.1:6142").await.unwrap();
+
+    loop {
+        let (mut socket, _) = listener.accept().await?;
+
+        tokio::spawn(async move {
+            let mut buf = vec![0; 1024];
+
+            loop {
+                match socket.read(&mut buf).await {
+                    // Return value of `Ok(0)` signifies that the remote has
+                    // closed
+                    Ok(0) => return,
+                    Ok(n) => {
+                        // Copy the data back to socket
+                        if socket.write_all(&buf[..n]).await.is_err() {
+                            // Unexpected socket error. There isn't much we can
+                            // do here so just stop processing.
+                            return;
+                        }
+                    }
+                    Err(_) => {
+                        // Unexpected socket error. There isn't much we can do
+                        // here so just stop processing.
+                        return;
+                    }
+                }
+            }
+        });
+    }
+}
+```
+
+TODO:
+- Call out imports
+- use allocated vec for buf and not stack array.
+- return 0 means socket closed.
+- note on error handling.
+
+Full code is found [here][full]
+
+[full]: #
+
 [`AsyncRead`]: https://docs.rs/tokio/0.2/tokio/io/trait.AsyncRead.html
 [`AsyncWrite`]: https://docs.rs/tokio/0.2/tokio/io/trait.AsyncWrite.html
 [`AsyncReadExt`]: https://docs.rs/tokio/0.2/tokio/io/trait.AsyncReadExt.html
@@ -133,11 +317,6 @@ io::copy(&mut reader, &mut file).await?;
 [stdout]: https://docs.rs/tokio/0.2/tokio/io/fn.stdout.html
 [stderr]: https://docs.rs/tokio/0.2/tokio/io/fn.stderr.html
 [copy]: https://docs.rs/tokio/0.2/tokio/io/fn.copy.html
-
-# Echo server
-
-TODO: Cover a few ways to implement an echo server
-
-# Redis protocol parsing
-
-TODO: Cover connection.rs from mini-redis
+[split]: https://docs.rs/tokio/0.2/tokio/io/fn.split.html
+[`TcpStream::split`]: https://docs.rs/tokio/0.2/tokio/net/struct.TcpStream.html#method.split
+[`into_split`]: https://docs.rs/tokio/0.2/tokio/net/struct.TcpStream.html#method.into_split
