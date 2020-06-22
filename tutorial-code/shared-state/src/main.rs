@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 use bytes::Bytes;
->>>>>>> origin/master
 use mini_redis::{Connection, Frame};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
