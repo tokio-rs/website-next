@@ -12,10 +12,10 @@ where a reader or writer is expected.
 # `AsyncRead` and `AsyncWrite`
 
 These two traits provide the facilities to asynchronously read from and write to
-byte streams. However, unlike `std`, these traits are intended to be
-**implemented** and not called directly. Instead, consumers of these traits will
-use utility methods provided by [`AsyncReadExt`] and [`AsyncWriteExt`]. Those
-two traits are where familiar methods are found.
+byte streams. The methods on these traits are typically not called directly,
+similar to how you don't manually call the `poll` method from the `Future`
+trait. Instead, you will use them through the utility methods provided by
+[`AsyncReadExt`] and [`AsyncWriteExt`].
 
 Let's briefly look at a few of these methods. All of these functions as `async`
 and must be used with `.await`.
@@ -47,7 +47,7 @@ async fn main() -> io::Result<()> {
 }
 ```
 
-## `async fn write()`
+## `async fn read_to_end()`
 
 [`AsyncReadExt::read_to_end`][read_to_end] reads all bytes from the stream until
 EOF.
@@ -80,8 +80,10 @@ use tokio::fs::File;
 async fn main() -> io::Result<()> {
     let mut file = File::create("foo.txt").await?;
 
-    // Writes some prefix of the byte string, not necessarily all of it.
-    file.write(b"some bytes").await?;
+    // Writes some prefix of the byte string, but not necessarily all of it.
+    let n = file.write(b"some bytes").await?;
+
+    println!("Wrote the first {} bytes of 'some bytes'.", n);
     Ok(())
 }
 ```
@@ -123,6 +125,8 @@ let mut file = File::create("foo.txt").await?;
 
 io::copy(&mut reader, &mut file).await?;
 ```
+
+Note that this uses the fact that byte arrays also implement `AsyncRead`.
 
 # Echo server
 
