@@ -314,11 +314,13 @@ while let Some(cmd) = rx.recv().await {
     match cmd {
         Command::Get { key, resp } => {
             let res = client.get(&key).await;
-            resp.send(res).unwrap();
+            // Ignore errors
+            let _ = resp.send(res);
         }
         Command::Set { key, val, resp } => {
             let res = client.set(&key, val.into()).await;
-            resp.send(res).unwrap();
+            // Ignore errors
+            let _ = resp.send(res);
         }
     }
 }
@@ -327,6 +329,11 @@ while let Some(cmd) = rx.recv().await {
 Calling `send` on `oneshot::Sender` completes immediately and does **not**
 require an `.async`. This is because `send` on an `oneshot` channel will always
 fail or succeed immediately without any form of waiting.
+
+Sending a value on a oneshot channel returns `Err` when the receiver half has
+dropped. This indicates the receiver is no longer interested in the response. In
+our scenario, the receiver cancelling interest is an acceptable event. The `Err`
+returned by `resp.send(...)` does not need to be handled.
 
 You can find the entire code [here][full].
 

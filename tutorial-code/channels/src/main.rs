@@ -34,11 +34,13 @@ async fn main() {
             match cmd {
                 Command::Get { key, resp } => {
                     let res = client.get(&key).await;
-                    resp.send(res).unwrap();
+                    // Ignore errors
+                    let _ = resp.send(res);
                 }
                 Command::Set { key, val, resp } => {
                     let res = client.set(&key, val.into()).await;
-                    resp.send(res).unwrap();
+                    // Ignore errors
+                    let _ = resp.send(res);
                 }
             }
         }
@@ -53,7 +55,10 @@ async fn main() {
         };
 
         // Send the GET request
-        tx.send(cmd).await.unwrap();
+        if tx.send(cmd).await.is_err() {
+            eprintln!("connection task shutdown");
+            return;
+        }
 
         // Await the response
         let res = resp_rx.await;
@@ -69,7 +74,10 @@ async fn main() {
         };
 
         // Send the SET request
-        tx2.send(cmd).await.unwrap();
+        if tx2.send(cmd).await.is_err() {
+            eprintln!("connection task shutdown");
+            return;
+        }
 
         // Await the response
         let res = resp_rx.await;
