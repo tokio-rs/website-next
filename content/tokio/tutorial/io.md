@@ -353,7 +353,7 @@ the buffer.
 
 ## Handling EOF
 
-When the read half of the TCP stream is shutdown, a call to `read()` returns
+When the read half of the TCP stream is shut down, a call to `read()` returns
 `Ok(0)`. It is important to exit the read loop at this point. Forgetting to
 break from the read loop on EOF is a common source of bugs.
 
