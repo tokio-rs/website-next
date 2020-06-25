@@ -9,6 +9,9 @@ Specific types implement these traits as appropriate ([`TcpStream`], [`File`],
 of data structures, such as `Vec<u8>` and `&[u8]`. This allows using byte arrays
 where a reader or writer is expected.
 
+This page will cover basic I/O reading and writing with Tokio and work through a
+few examples. The next page will get into a more advanced I/O example.
+
 # `AsyncRead` and `AsyncWrite`
 
 These two traits provide the facilities to asynchronously read from and write to
