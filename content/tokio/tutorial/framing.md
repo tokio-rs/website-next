@@ -93,6 +93,16 @@ pub struct Connection {
     stream: TcpStream,
     buffer: BytesMut,
 }
+
+impl Connection {
+    pub fn new(stream: TcpStream) -> Connection {
+        Connection {
+            stream,
+            // Allocate the buffer with 4kb of capacity.
+            buffer: BytesMut::with_capacity(4096),
+        }
+    }
+}
 ```
 
 Next, we implement the `read_frame()` function.
@@ -129,12 +139,97 @@ pub async fn read_frame(&mut self) -> Result<Option<Frame>> {
 }
 ```
 
-Let's break this down. First, `read_frame` operates in a loop. First,
+Let's break this down. `read_frame` operates in a loop. First,
 `self.parse_frame()` is called. This will attempt to parse a redis frame from
 `self.buffer`. If there is enough data to parse a frame, the frame is returned
-to the caller of `read_frame()`. Otherwise, we attempt to read more data from
-the socket into the buffer.
+to the caller of `read_frame()`.Otherwise, we attempt to read more data from the
+socket into the buffer. After reading more data, `parse_frame()` is called
+again. This time, if enough data has been received, parsing may succeed.
+
+When reading from the stream, a return of value `0` indicates that no more data
+will be received from the peer. If the read buffer still has data in it, this
+indicates a partial frame has been received and the connection is being
+terminated abruptly. This is an error condition and `Err` is returned.
 
 ## The `Buf` trait
 
-TODO: what up
+When reading from the stream, `read_buf` is called. This version of the read
+function takes a value implementing [`BufMut`] from the [`bytes`] crate.
+
+First, consider how we would implement the same read loop using `read()`.
+`Vec<u8>` could be used instead of `BytesMut`.
+
+```rust
+pub struct Connection {
+    stream: TcpStream,
+    buffer: Vec<u8>,
+    cursor: usize,
+}
+
+impl Connection {
+    pub fn new(stream: TcpStream) -> Connection {
+        Connection {
+            stream,
+            // Allocate the buffer with 4kb of capacity.
+            buffer: vec![0; 4096],
+        }
+    }
+}
+```
+
+And the `read_frame()` function on `Connection`:
+
+```rust
+pub async fn read_frame(&mut self) -> Result<Option<Frame>> {
+    loop {
+        if let Some(frame) = self.parse_frame()? {
+            return Ok(Some(frame));
+        }
+
+        // Ensure the buffer has capacity
+        if self.buffer.len() == self.cursor {
+            // Grow the buffer
+            self.buffer.resize(self.cursor * 2, 0);
+        }
+
+        // Read into the buffer, tracking the number of bytes read
+        let n = self.stream.read(&mut self.buffer[self.cursor..]).await?
+
+        if 0 == n {
+            if self.cursor == 0 {
+                return Ok(None);
+            } else {
+                return Err("connection reset by peer".into());
+            }
+        } else {
+            // Update our cursor
+            self.cursor += n;
+        }
+    }
+}
+```
+
+When working with byte arrays and `read`, we must also maintain a cursor
+tracking how much data has been buffered. We must ensure to pass the empty
+portion of the buffer to `read()`. Otherwise, we would overwrite buffered data.
+If our buffer gets filled up, we must grow the buffer in order to keep reading.
+In `parse_frame()` (not included), we would need to parse data contained by
+`self.buffer[..self.cursor]`.
+
+Because pairing a byte array with a cursor is very common, the `bytes` crate
+provides an abstraction representing a byte array and cursor. The `Buf` trait is
+implemented by types from which data can be read. The `BufMut` trait is
+implemented by types into which data can be written. When passing a `T: BufMut`
+to `read_buf()`, the buffer's internal cursor is automatically updated by
+`read_buf`. Because of this, in our versino of `read_frame`, we do not need to
+manage our own cursor.
+
+Additionally, when using `Vec<u8>`, the buffer must be **initialized**. `vec![0;
+4096]` allocates an array of 4096 bytes and writes zero to every entry. When
+resizing the buffer, the new capacity must also be initialized with zeros. The
+initialization process is not free. When working with `BytesMut` and `BufMut`,
+capacity is **uninitialized**. The `BytesMut` abstraction prevents us from
+reading the uninitialized memory. This lets us avoid the initialization step.
+
+[`BufMut`]: https://docs.rs/bytes/0.5/bytes/trait.BufMut.html
+[`bytes`]: docs.rs/bytes/
