@@ -233,3 +233,187 @@ reading the uninitialized memory. This lets us avoid the initialization step.
 
 [`BufMut`]: https://docs.rs/bytes/0.5/bytes/trait.BufMut.html
 [`bytes`]: docs.rs/bytes/
+
+# Parsing
+
+Now, let's look at the `parse_frame()` function. Parsing is done in two steps.
+
+1. Ensure a full frame is buffered and find the end index of the frame.
+2. Parse the frame
+
+The `mini-redis` crate provides us with a function for both of these steps:
+
+1. [`Frame::check`](#)
+2. [`Frame::parse`](#)
+
+We will also reuse the `Buf` abstraction to help. A `Buf` is passed into
+`Frame::check`. As the `check` funtion iterates the passed in buffer, the
+internal cursor will be advanaced. When `check` returns, the buffer's internal
+cursor points to the end of the frame.
+
+For the `Buf` type, we will use `std::io::Cursor<&[u8]>`.
+
+```rust
+use frame::Error::Incomplete;
+use std::io::Cursor;
+
+fn parse_frame(&mut self) -> crate::Result<Option<Frame>> {
+    // Create the `T: Buf` type.
+    let mut buf = Cursor::new(&self.buffer[..]);
+
+    // Check a full frame is parsed
+    match Frame::check(&mut buf) {
+        Ok(_) => {
+            // Get the byte length of the frame
+            let len = buf.position() as usize;
+
+            // Reset the internal cursor for the call to `parse`.
+            buf.set_position(0);
+
+            // Parse the frame
+            let frame = Frame::parse(&mut buf)?;
+
+            // Discard the parsed frame from the buffer
+            self.buffer.advance(len);
+
+            // Return the parsed frame to the caller.
+            Ok(Some(frame))
+        }
+        // Not enough data has been buffered
+        Err(Incomplete) => Ok(None),
+        // An error was encountered
+        Err(e) => Err(e.into()),
+    }
+}
+```
+
+The full [`Frame::check`][check] function can be found [here][check]. We will
+not cover it in its entirety.
+
+The relevant thing to note is that `Buf`'s "byte iterator" style APIs are used.
+These fetch data and advance the internal cursor. For example, to parse a frame,
+the first byte is checked to determine the type of the frame. The function used
+is [`Buf::get_u8`]. This fetches the byte at the current cursor's position and
+advances the cursor by one.
+
+There are more useful methods on the [`Buf`] trait. Check the [API docs][`Buf`]
+for more details.
+
+[check]: https://github.com/tokio-rs/mini-redis/blob/master/src/frame.rs#L63-L100
+[`Buf::get_u8`]: https://docs.rs/bytes/0.5/bytes/buf/trait.Buf.html#method.get_u8
+[`Buf`]: https://docs.rs/bytes/0.5/bytes/buf/trait.Buf.html#
+
+# Buffered writes
+
+The other half of the framing API is the `write_frame(frame)` function. This
+function writes an entire frame to the socket. In order to minimize `write`
+syscalls, writes will be buffered. A write buffer is maintained and frames are
+encoded to this buffer before being written to the socket. However, unlike
+`read_frame()`, the entire frame is not always buffered to a byte array before
+writing to the socket.
+
+Consider a bulk stream frame. The value being written is `Frame::Bulk(Bytes)`.
+The wire format of a bulk frame is a frame head, which consists of the `$`
+character followed by the data length in bytes. The majority of the frame is the
+contents of the `Bytes` value. If the data is large, copying it to an
+intermediate buffer would be costly.
+
+To implement buffered writes, we will use the [`BufWriter` struct][buf-writer].
+This struct is initialized with a `T: AsyhncWrite` and implements `AsyncWrite`
+itself. When `write` is called on `BufWriter`, the write does not go directly to
+the inner writer, but to a buffer. When the buffer is full, the contents are
+flushed to the inner writer and the inner buffer is cleared. There are also
+optimizations that allow bypassing the buffer in certain cases.
+
+We will not attempt a full implementation of `write_frame()` as part of the
+tutorial. See the full implementation [here][write-frame].
+
+First, the `Connection` struct is updated:
+
+
+```rust
+use tokio::io::BufWriter;
+
+pub struct Connection {
+    stream: BufWriter<TcpStream>,
+    buffer: BytesMut,
+}
+
+impl Connection {
+    pub fn new(stream: TcpStream) -> Connection {
+        Connection {
+            stream: BufWriter::new(stream),
+            buffer: BytesMut::with_capacity(4096),
+        }
+    }
+}
+```
+
+Next, `write_frame()` is implemented.
+
+```rust
+use tokio::io::AsyncWriteExt;
+
+async fn write_value(&mut self, frame: &Frame) -> io::Result<()> {
+    match frame {
+        Frame::Simple(val) => {
+            self.stream.write_u8(b'+').await?;
+            self.stream.write_all(val.as_bytes()).await?;
+            self.stream.write_all(b"\r\n").await?;
+        }
+        Frame::Error(val) => {
+            self.stream.write_u8(b'-').await?;
+            self.stream.write_all(val.as_bytes()).await?;
+            self.stream.write_all(b"\r\n").await?;
+        }
+        Frame::Integer(val) => {
+            self.stream.write_u8(b':').await?;
+            self.write_decimal(*val).await?;
+        }
+        Frame::Null => {
+            self.stream.write_all(b"$-1\r\n").await?;
+        }
+        Frame::Bulk(val) => {
+            let len = val.len();
+
+            self.stream.write_u8(b'$').await?;
+            self.write_decimal(len as u64).await?;
+            self.stream.write_all(val).await?;
+            self.stream.write_all(b"\r\n").await?;
+        }
+        Frame::Array(_val) => unimplemented!(),
+    }
+
+    self.stream.flush().await;
+
+    Ok(())
+}
+```
+
+The functions used here are provided by [`AsyncWriteExt`]. They are available on
+`TcpStream` as well, but it would not be advisable to issue single byte writes
+without the intermediate buffer.
+
+* [`write_u8`] writes a single byte to the writer.
+* [`write_all`] writes the entire slice to the writer.
+* [`write_decimal`] is implemented by mini-redis.
+
+The function ends with a call to `self.stream.flush().await`. Because
+`BufWriter` stores writes in an intermediate buffer, calls to `write` do not
+guarantee that the data is written to the socket. Before returning, we want the
+frame to be written to the socket. The call to `flush()` writes any data pending
+in the buffer to the socket.
+
+Another alternative would be to **not** call `flush()` in `write_frame()`.
+Instead, provide a `flush()` function on `Connection`. This would allow the
+caller to write queue multiple small frames in the write buffer then write them
+all to the socket with one `write` syscall. Doing this complicates the
+`Connection` API. Simplicty is one of mini-redis' goals, so we decided to
+include the `flush().await` call in `fn write_frame()`.
+
+
+[buf-writer]: https://docs.rs/tokio/0.2/tokio/io/struct.BufWriter.html
+[write-frame]: https://github.com/tokio-rs/mini-redis/blob/master/src/connection.rs#L159-L184
+[`AsyncWriteExt`]: https://docs.rs/tokio/0.2/tokio/io/trait.AsyncWriteExt.html
+[`write_u8`]: https://docs.rs/tokio/0.2/tokio/io/trait.AsyncWriteExt.html#method.write_u8
+[`write_decimal`]: https://docs.rs/tokio/0.2/tokio/io/trait.AsyncWriteExt.html#method.write_u8
