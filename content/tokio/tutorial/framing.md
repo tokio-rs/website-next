@@ -72,18 +72,18 @@ You can find the details of the Redis wire protocol [here][proto].
 
 # Buffered reads
 
-The `read_frame` waits for an entire frame to be received before returning. A
-single call to `TcpStream::read()` may return an arbitrary amount of data. It
-could contain an entire frame, a partial frame, or multiple frames. If a partial
-frame is received, the data is buffered and more data is read from the socket.
-If multiple frames are received, the first frame is returned and the rest of the
-data is buffered until the next call to `read_frame`.
+The `read_frame` method waits for an entire frame to be received before
+returning. A single call to `TcpStream::read()` may return an arbitrary amount
+of data. It could contain an entire frame, a partial frame, or multiple frames.
+If a partial frame is received, the data is buffered and more data is read from
+the socket.  If multiple frames are received, the first frame is returned and
+the rest of the data is buffered until the next call to `read_frame`.
 
 To implement this, `Connection` needs a read buffer field. Data is read from the
 socket into the read buffer. When a frame is parsed, the corresponding data is
 removed from the buffer.
 
-We will use `BytesMut` as the buffer type. This is a mutable version of `Bytes`.
+We will use [`BytesMut`] as the buffer type. This is a mutable version of [`Bytes`].
 
 ```rust
 use bytes::BytesMut;
@@ -105,7 +105,7 @@ impl Connection {
 }
 ```
 
-Next, we implement the `read_frame()` function.
+Next, we implement the `read_frame()` method.
 
 ```rust
 use bytes::Buf;
@@ -139,17 +139,20 @@ pub async fn read_frame(&mut self) -> Result<Option<Frame>> {
 }
 ```
 
-Let's break this down. `read_frame` operates in a loop. First,
+Let's break this down. The `read_frame` method operates in a loop. First,
 `self.parse_frame()` is called. This will attempt to parse a redis frame from
 `self.buffer`. If there is enough data to parse a frame, the frame is returned
 to the caller of `read_frame()`.Otherwise, we attempt to read more data from the
 socket into the buffer. After reading more data, `parse_frame()` is called
 again. This time, if enough data has been received, parsing may succeed.
 
-When reading from the stream, a return of value `0` indicates that no more data
+When reading from the stream, a return value of `0` indicates that no more data
 will be received from the peer. If the read buffer still has data in it, this
 indicates a partial frame has been received and the connection is being
 terminated abruptly. This is an error condition and `Err` is returned.
+
+[`BytesMut`]: https://docs.rs/bytes/0.5/bytes/struct.BytesMut.html
+[`Bytes`]: https://docs.rs/bytes/0.5/bytes/struct.Bytes.html
 
 ## The `Buf` trait
 
@@ -221,7 +224,7 @@ provides an abstraction representing a byte array and cursor. The `Buf` trait is
 implemented by types from which data can be read. The `BufMut` trait is
 implemented by types into which data can be written. When passing a `T: BufMut`
 to `read_buf()`, the buffer's internal cursor is automatically updated by
-`read_buf`. Because of this, in our versino of `read_frame`, we do not need to
+`read_buf`. Because of this, in our version of `read_frame`, we do not need to
 manage our own cursor.
 
 Additionally, when using `Vec<u8>`, the buffer must be **initialized**. `vec![0;
@@ -232,14 +235,14 @@ capacity is **uninitialized**. The `BytesMut` abstraction prevents us from
 reading the uninitialized memory. This lets us avoid the initialization step.
 
 [`BufMut`]: https://docs.rs/bytes/0.5/bytes/trait.BufMut.html
-[`bytes`]: docs.rs/bytes/
+[`bytes`]: https://docs.rs/bytes/
 
 # Parsing
 
 Now, let's look at the `parse_frame()` function. Parsing is done in two steps.
 
 1. Ensure a full frame is buffered and find the end index of the frame.
-2. Parse the frame
+2. Parse the frame.
 
 The `mini-redis` crate provides us with a function for both of these steps:
 
@@ -251,7 +254,7 @@ We will also reuse the `Buf` abstraction to help. A `Buf` is passed into
 internal cursor will be advanaced. When `check` returns, the buffer's internal
 cursor points to the end of the frame.
 
-For the `Buf` type, we will use `std::io::Cursor<&[u8]>`.
+For the `Buf` type, we will use [`std::io::Cursor<&[u8]>`][`Cursor`].
 
 ```rust
 use frame::Error::Incomplete;
@@ -261,7 +264,7 @@ fn parse_frame(&mut self) -> crate::Result<Option<Frame>> {
     // Create the `T: Buf` type.
     let mut buf = Cursor::new(&self.buffer[..]);
 
-    // Check a full frame is parsed
+    // Check whether a full frame is available
     match Frame::check(&mut buf) {
         Ok(_) => {
             // Get the byte length of the frame
@@ -301,7 +304,8 @@ for more details.
 
 [check]: https://github.com/tokio-rs/mini-redis/blob/master/src/frame.rs#L63-L100
 [`Buf::get_u8`]: https://docs.rs/bytes/0.5/bytes/buf/trait.Buf.html#method.get_u8
-[`Buf`]: https://docs.rs/bytes/0.5/bytes/buf/trait.Buf.html#
+[`Buf`]: https://docs.rs/bytes/0.5/bytes/buf/trait.Buf.html
+[`Cursor`]: https://doc.rust-lang.org/stable/std/io/struct.Cursor.html
 
 # Buffered writes
 
@@ -319,7 +323,7 @@ contents of the `Bytes` value. If the data is large, copying it to an
 intermediate buffer would be costly.
 
 To implement buffered writes, we will use the [`BufWriter` struct][buf-writer].
-This struct is initialized with a `T: AsyhncWrite` and implements `AsyncWrite`
+This struct is initialized with a `T: AsyncWrite` and implements `AsyncWrite`
 itself. When `write` is called on `BufWriter`, the write does not go directly to
 the inner writer, but to a buffer. When the buffer is full, the contents are
 flushed to the inner writer and the inner buffer is cleared. There are also
