@@ -110,7 +110,9 @@ Next, we implement the `read_frame()` method.
 ```rust
 use bytes::Buf;
 
-pub async fn read_frame(&mut self) -> Result<Option<Frame>> {
+pub async fn read_frame(&mut self)
+    -> Result<Option<Frame>>
+{
     loop {
         // Attempt to parse a frame from the buffered data. If
         // enough data has been buffered, the frame is
@@ -183,7 +185,9 @@ impl Connection {
 And the `read_frame()` function on `Connection`:
 
 ```rust
-pub async fn read_frame(&mut self) -> Result<Option<Frame>> {
+pub async fn read_frame(&mut self)
+    -> Result<Option<Frame>>
+{
     loop {
         if let Some(frame) = self.parse_frame()? {
             return Ok(Some(frame));
@@ -195,8 +199,10 @@ pub async fn read_frame(&mut self) -> Result<Option<Frame>> {
             self.buffer.resize(self.cursor * 2, 0);
         }
 
-        // Read into the buffer, tracking the number of bytes read
-        let n = self.stream.read(&mut self.buffer[self.cursor..]).await?
+        // Read into the buffer, tracking the number
+        // of bytes read
+        let n = self.stream.read(
+            &mut self.buffer[self.cursor..]).await?
 
         if 0 == n {
             if self.cursor == 0 {
@@ -260,7 +266,9 @@ For the `Buf` type, we will use [`std::io::Cursor<&[u8]>`][`Cursor`].
 use frame::Error::Incomplete;
 use std::io::Cursor;
 
-fn parse_frame(&mut self) -> crate::Result<Option<Frame>> {
+fn parse_frame(&mut self)
+    -> crate::Result<Option<Frame>>
+{
     // Create the `T: Buf` type.
     let mut buf = Cursor::new(&self.buffer[..]);
 
@@ -270,16 +278,17 @@ fn parse_frame(&mut self) -> crate::Result<Option<Frame>> {
             // Get the byte length of the frame
             let len = buf.position() as usize;
 
-            // Reset the internal cursor for the call to `parse`.
+            // Reset the internal cursor for the
+            // call to `parse`.
             buf.set_position(0);
 
             // Parse the frame
             let frame = Frame::parse(&mut buf)?;
 
-            // Discard the parsed frame from the buffer
+            // Discard the frame from the buffer
             self.buffer.advance(len);
 
-            // Return the parsed frame to the caller.
+            // Return the frame to the caller.
             Ok(Some(frame))
         }
         // Not enough data has been buffered
@@ -358,7 +367,9 @@ Next, `write_frame()` is implemented.
 ```rust
 use tokio::io::AsyncWriteExt;
 
-async fn write_value(&mut self, frame: &Frame) -> io::Result<()> {
+async fn write_value(&mut self, frame: &Frame)
+    -> io::Result<()>
+{
     match frame {
         Frame::Simple(val) => {
             self.stream.write_u8(b'+').await?;
