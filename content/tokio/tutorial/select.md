@@ -14,30 +14,40 @@ when a **single** computation completes.
 For example:
 
 ```rust
+use tokio::sync::oneshot;
+
 #[tokio::main]
 async fn main() {
-    let t1 = task::spawn(async { "one" });
-    let t2 = task::spawn(async { "two" });
+    let (tx1, rx1) = oneshot::channel();
+    let (tx2, rx2) = oneshot::channel();
+
+    tokio::spawn(async {
+        let _ = tx1.send("one");
+    });
+
+    tokio::spawn(async {
+        let _ = tx2.send("two");
+    });
 
     tokio::select! {
-        val = t1 => {
-            println!("t1 completed first with {}", val);
+        val = rx1 => {
+            println!("rx1 completed first with {}", val);
         }
-        val = t2 => {
-            println!("t2 completed first with {}", val);
+        val = rx2 => {
+            println!("rx2 completed first with {}", val);
         }
     }
 }
 ```
 
-Two tasks are spanwed. These tasks immediately return a value. Either task could
-complete first. The `select!` statement awaits on both tasks and binds `val` to
-the value returned by the task. When either `t1` or `t2` complete, the
-associated block is executed.
+Two oneshot channels are used. Either channel could complete first. The
+`select!` statement awaits on both channels and binds `val` to the value
+returned by the task. When either `tx1` or `tx2` complete, the associated block
+is executed.
 
 The branch that **does** not complete is dropped. In the example, the
-computation is awaiting the `Joinhandle` for each spawned task. The `JoinHandle`
-for the task that did not complete yet is dropped.
+computation is awaiting the `oneshot::Receiver` for each channel. The
+`oneshot::Receiver` for the channel that did not complete yet is dropped.
 
 [[info]]
 | In asynchronous Rust, dropping an asynchronous computation before it completes
