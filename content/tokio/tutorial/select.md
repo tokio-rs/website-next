@@ -45,7 +45,7 @@ Two oneshot channels are used. Either channel could complete first. The
 returned by the task. When either `tx1` or `tx2` complete, the associated block
 is executed.
 
-The branch that **does** not complete is dropped. In the example, the
+The branch that **does not** complete is dropped. In the example, the
 computation is awaiting the `oneshot::Receiver` for each channel. The
 `oneshot::Receiver` for the channel that did not complete yet is dropped.
 
@@ -63,11 +63,12 @@ branches. Each branch is structured as:
 ```
 
 When the `select` macro is evaluated, all the `<async expression>`s are
-aggregated and executed concurrently. When the **first** expression completes,
-the result is matched against `<pattern>`. If the result matches the pattern,
-then all remaining async expressions are dropped and `<handler>` is executed.
-The `<handler>` expression has access to any bindings established by
-`<pattern>`. 
+aggregated and executed concurrently. When an expression completes, the result
+is matched against `<pattern>`. If the result matches the pattern, then all
+remaining async expressions are dropped and `<handler>` is executed. The
+`<handler>` expression has access to any bindings established by `<pattern>`. If
+multiple branches complete simultaneously, one will be picked randomly. This
+provides a level of fairness.
 
 The basic case is `<pattern>` is a variable name, the result of the async
 expression is bound to the variable name and `<handler>` has access to that
@@ -111,7 +112,7 @@ Here, we select on a oneshot and accepting sockets from a `TcpListener`.
 
 ```rust
 #[tokio::main]
-async fn main() -> io::Result<()> {
+async fn main() {
     let (tx, rx) = oneshot::channel();
 
     tokio::spawn(async move {
@@ -131,8 +132,6 @@ async fn main() -> io::Result<()> {
             println!("terminating accept loop");
         }
     }
-
-    Ok(())
 }
 ```
 
@@ -172,8 +171,12 @@ not needed, it is good practice to have the expression evaluate to `()`.
 
 ## Errors
 
-Using the `?` operator immediately propagates the error out of the `select!`
-expression. Let's look at the accept loop example again:
+Using the `?` operator propagages the error from the expression. How this works
+depends on whether `?` is used from an async expression> or from a handler.
+Using `?` in an async expression propagates the error out of the async
+expression. This makes the output of the async expression a `Result`. Using `?`
+from a handler immediately propagates the error out of the `select!` expression.
+Let's look at the accept loop example again:
 
 ```rust
 #[tokio::main]
@@ -184,12 +187,14 @@ async fn main() -> io::Result<()> {
     let mut listener = TcpListener::bind("localhost:3465").await?;
 
     tokio::select! {
-        _ = async {
+        res = async {
             loop {
                 let (socket, _) = listener.accept().await?;
                 tokio::spawn(async move { process(socket) });
             }
-        } => {}
+        } => {
+            res?;
+        }
         _ => rx => {
             println!("terminating accept loop");
         }
@@ -199,11 +204,9 @@ async fn main() -> io::Result<()> {
 }
 ```
 
-Notice `listener.accept().await?`. The `?` operate propagates errors by
-returning `Err`. The containing function is the `main` function. On `accept()`
-error, the main function returns with the error.
-
-The same applies for `?` used in `<handler>` expressions.
+Notice `listener.accept().await?`. The `?` operator propagates the error out of
+that expression and to the `res` binding. On an error, `res` will be set to
+`Err(_)`. Then, in the handler, the `?` operator is used again. The `res?` statement will propagate an error out of the `main` function.
 
 ## Pattern matching
 
