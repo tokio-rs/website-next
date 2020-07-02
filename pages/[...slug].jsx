@@ -9,7 +9,14 @@ const menu = {
         nested: ["reliable", "fast", "easy", "flexible"],
       },
       tutorial: {
-        nested: ["hello-tokio", "spawning", "shared-state", "channels", "io", "select"],
+        nested: [
+          "hello-tokio",
+          "spawning",
+          "shared-state",
+          "channels",
+          "io",
+          "select",
+        ],
       },
       topics: {
         nested: ["async", "concurrency", "features"],

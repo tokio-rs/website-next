@@ -258,7 +258,84 @@ the `else` branch is evaluated.
 
 ## Borrowing
 
-TODO
+When spawning tasks, the spawned async expression must own all of its data. The
+`select!` macro does not have this limitation. Each branch's async expression
+may borrow data and operate concurrently. Following Rust's borrow rules,
+multiple async expressions may immutably borrow a single piece of data **or** a
+single async expression may mutably borrow a piece of data.
+
+Let's look at some examples. Here, we simultaneously send the same data to two
+different TCP destinations.
+
+```rust
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
+use std::io;
+use std::net::SocketAddr;
+
+async fn race(
+    data: &[u8],
+    addr1: SocketAddr,
+    addr2: SocketAddr
+) -> io::Result<()> {
+    tokio::select! {
+        Ok(_) = async {
+            let socket = TcpStream::connect(addr1).await?;
+            socket.write_all(data).await?;
+            Ok(())
+        } => {}
+        Ok(_) = async {
+            let socket = TcpStream::connect(addr1).await?;
+            socket.write_all(data).await?;
+            Ok(())
+        } => {}
+        else => {}
+    }
+    let socket1 = TcpStream::connect(addr1).await?
+    let socket2 = TcpStream::
+}
+# fn main() {}
+```
+
+The `data` variable is being borrowed **immutably** from both async expressions.
+When one of the operations completes successfully, the other one is dropped.
+Because we pattern match on `Ok(_)`, if an expression fails, the other one
+continues to execute.
+
+When it comes to each branch's `<handler>`, `select!` guarantees that only a
+single `<handler>` runs. Because of this, each `<handler>` may mutably borrow
+the same data.
+
+For example:
+
+```rust
+use tokio::sync::oneshot;
+
+#[tokio::main]
+async fn main() {
+    let (tx1, rx1) = oneshot::channel();
+    let (tx2, rx2) = oneshot::channel();
+
+    let mut out = String::new();
+
+    // Send values on `tx1` and `tx2`.
+#   tokio::spawn(async {
+#        let _ = tx1.send("one");
+#        let _ = tx2.send("two");
+#    });
+
+    tokio::select! {
+        _ = rx1 => {
+            out.push_str("rx1 completed");
+        }
+        _ = rx2 => {
+            out.push_str("rx2 completed");
+        }
+    }
+
+    println!("{}", out);
+}
+```
 
 ## Loops
 
