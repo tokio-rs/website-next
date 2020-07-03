@@ -15,6 +15,7 @@ const menu = {
           "shared-state",
           "channels",
           "io",
+          "framing",
           "select",
         ],
       },
