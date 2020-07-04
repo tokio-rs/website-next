@@ -1,5 +1,5 @@
 ---
-title: "Select & Join"
+title: "Select"
 ---
 
 So far, when we wanted to add concurrency to the system, we spawned a new task.
@@ -53,7 +53,7 @@ computation is awaiting the `oneshot::Receiver` for each channel. The
 | In asynchronous Rust, dropping an asynchronous computation before it completes
 | is used to signal cancellation. The next page will cover this in more depth.
 
-## Syntax
+# Syntax
 
 The `select!` macro can handle more than two branches. The current limit is 64
 branches. Each branch is structured as:
@@ -139,7 +139,7 @@ The accept loop runs until an error is encountered or `rx` receives a value. The
 `_` pattern indicates that we have no interest in the return value of the async
 computation.
 
-## Return value
+# Return value
 
 The `tokio::select!` macro returns the result of the evaluated `<handler>` expression. 
 
@@ -169,7 +169,7 @@ Because of this, it is required that the `<handler>` expression for **each**
 branch evaluates to the same type. If the output of a `select!` expression is
 not needed, it is good practice to have the expression evaluate to `()`.
 
-## Errors
+# Errors
 
 Using the `?` operator propagages the error from the expression. How this works
 depends on whether `?` is used from an async expression or from a handler.
@@ -206,9 +206,10 @@ async fn main() -> io::Result<()> {
 
 Notice `listener.accept().await?`. The `?` operator propagates the error out of
 that expression and to the `res` binding. On an error, `res` will be set to
-`Err(_)`. Then, in the handler, the `?` operator is used again. The `res?` statement will propagate an error out of the `main` function.
+`Err(_)`. Then, in the handler, the `?` operator is used again. The `res?`
+statement will propagate an error out of the `main` function.
 
-## Pattern matching
+# Pattern matching
 
 Recall that the `select!` macro branch syntax was defined as:
 
@@ -216,7 +217,9 @@ Recall that the `select!` macro branch syntax was defined as:
 <pattern> = <async expression> => <handler>,
 ```
 
-So far, we have only used variable bindings for `<pattern>`. However, any Rust pattern can be used. For example, say we are receiving from multiple MPSC channels, we might do something like this:
+So far, we have only used variable bindings for `<pattern>`. However, any Rust
+pattern can be used. For example, say we are receiving from multiple MPSC
+channels, we might do something like this:
 
 ```rust
 use tokio::sync::mpsc;
@@ -256,7 +259,7 @@ expression must evaluate to a value. When using pattern matching, it is possible
 that **none** of the branches match their associated patterns. If this happens,
 the `else` branch is evaluated.
 
-## Borrowing
+# Borrowing
 
 When spawning tasks, the spawned async expression must own all of its data. The
 `select!` macro does not have this limitation. Each branch's async expression
@@ -337,17 +340,203 @@ async fn main() {
 }
 ```
 
-## Loops
+# Loops
 
-TODO
+The `select!` macro can be used in loops. We will now go over some examples and
+point out some useful patterns. Let's start with selecting over multiple channels.
 
-# `tokio::join!`
+```rust
+use tokio::sync::mpsc;
 
-TODO
+#[tokio::main]
+async fn main() {
+    let (tx1, rx1) = mpsc::channel(128);
+    let (tx2, rx2) = mpsc::channel(128);
+    let (tx3, rx3) = mpsc::channel(128);
+# tokio::spawn(async move { drop((tx1, tx2, tx3)) });
 
-# `tokio::try_join!`
+    loop {
+        let msg = tokio::select! {
+            Some(msg) = rx1.recv() => msg,
+            Some(msg) = rx2.recv() => msg,
+            Some(msg) = rx3.recv() => msg,
+            else { break }
+        };
 
-TODO
+        println!("Got {}", msg);
+    }
+}
+```
+
+This example selects over the three channel receivers. When a message is
+received on any channel, it is written to STDOUT. When a channel is closed,
+`recv()` returns with `None`. By using pattern matching, the `select!`
+expression continues waiting on the remaining channels. When all channels are
+closed, the `else` branch is evaluated and the loop is terminated.
+
+When receiving on channels, the fairness feature described earlier is important.
+When the receive loop processes messages slower than they are pushed into the
+channels, the channels start to fill up. If `select!` **did not** randomly pick
+a branch to check first, on each iteration of the loop, `rx1` would be checked
+first. If `rx1` always contained a new message, the remaining channels would
+never be checked.
+
+Because `select!` **randomly** picks the first branch to check. Each iteration
+of the loop will probably check a different branch first. This results messages
+being processed from **all** channels instead of just the first one.
+
+## Resuming an async operation
+
+Now we will show how to run an asynchronous operation across multiple calls to
+`select!`. In the example, we have an MPSC channel of `i32` values an an
+asynchonous function. We want to run the asynchronous function until it
+completes **or** we receive an **even** message on the channel receiver.
+
+```rust
+async fn action() {
+    // Some asynchronous logic
+}
+
+#[tokio::main]
+async fn main() {
+    let (mut tx, mut rx) = tokio::sync::mpsc::channel(128);    
+#   tokio::spawn(async move {
+#       let _ = tx.send(1).await;
+#       let _ = tx.send(2).await;
+#   });
+    
+    let operation = action();
+    tokio::pin!(operation);
+    
+    loop {
+        tokio::select! {
+            _ = &mut operation => break,
+            Some(v) = rx.recv() => {
+                if v % 2 == 0 {
+                    break;
+                }
+            }
+        }
+    }
+}
+```
+
+Note how, instead of calling `action()` in the `select!` macro, it is called
+**outside** the loop. The return of `action()` is assigned to `operation`
+**without** calling `.await`. Then we call `tokio::pin!` on `operation`.
+
+Inside the `select!` loop, instead of passing in `operation`, we pass in `&mut
+operation`. The `operation` variable is tracking the in-flight asynchronous
+operation. Each iteration of the loop uses the same operation instead of issuing
+a new call to `action()`.
+
+The other `select!` branch receives a message from the channel. If the message
+is even, then we are done looping. Otherwise, start the `select!` again.
+
+This is the first time we use `tokio::pin!`. We aren't going to get into the
+details of pinning yet. The thing to note is that, in order to `.await` a
+**reference**, the value being referenced must be pinned or implement `Unpin`.
+
+If we remove the `tokio::pin!` line and try to compile, we get the following
+error:
+
+```text
+error[E0599]: no method named `poll` found for struct
+     `std::pin::Pin<&mut &mut impl std::future::Future>`
+     in the current scope
+  --> src/main.rs:16:9
+   |
+16 | /         tokio::select! {
+17 | |             _ = &mut operation => break,
+18 | |             Some(v) = rx.recv() => {
+19 | |                 if v % 2 == 0 {
+...  |
+22 | |             }
+23 | |         }
+   | |_________^ method not found in
+   |             `std::pin::Pin<&mut &mut impl std::future::Future>`
+   |
+   = note: the method `poll` exists but the following trait bounds
+            were not satisfied:
+           `impl std::future::Future: std::marker::Unpin`
+           which is required by
+           `&mut impl std::future::Future: std::future::Future`
+```
+
+This error isn't very clear and we haven't talked much about `Future` yet
+either. For now, think of `Future` as the trait that must be implemented by a
+value in order to call `.await` on it. If you hit an error about `Future` not
+being implemented when attempting to call `.await` on a **reference**, then the
+data probably needs to be pinned.
+
+Read more about [`Pin`][pin] on the [std][pin] documentation.
+
+[pin]: https://doc.rust-lang.org/std/pin/index.html
+
+## Modifying a branch
+
+Let's look at a slightly more complicated loop. We have:
+
+1. A channel of `i32` values.
+2. An async operation to perform on `i32` values.
+
+The logic we want to implement is:
+
+1. Wait for an **even** number on the channel.
+2. Start the asynchronous operation using the even number as input.
+3. Wait for the operation, but at the same time listen for more even numbers on
+   the channel.
+4. If a new even number is received before the existing operation completes,
+   abort the existing operation and start it over with the new even number.
+
+```rust
+async fn action(input: Option<i32>) -> Option<String> {
+    // If the input is `None`, return `None`
+    let i = input?;
+    // async logic here
+#   Some(i.to_string())
+}
+
+#[tokio::main]
+async fn main() {
+    let (mut tx, mut rx) = tokio::sync::mpsc::channel(128);
+    
+    let operation = action(None);
+    tokio::pin!(operation);
+    
+    tokio::spawn(async move {
+        let _ = tx.send(1).await;
+        let _ = tx.send(2).await;
+    });
+    
+    loop {
+        tokio::select! {
+            Some(v) = &mut operation => {
+                println!("GOT = {}", v);
+                return;
+            }
+            Some(v) = rx.recv() => {
+                if v % 2 == 0 {
+                    // `.set` is on `Pin`.
+                    operation.set(action(Some(v)));
+                }
+            }
+        }
+    }
+}
+```
+
+We use a similar strategy as the previous example. The async fn is called
+outside of the loop and assigned to `operation`. The `operation` variable is
+pinned. The loop selects on both `operation` and the channel receiver.
+
+Notice how `action` takes `Option<i32>` as an argument. Before we receive the
+first even number, we need to instantiate `operation` to something. We make
+`action` take `Option` and return `Option`. If `None` is passed in, `None` is
+returned. The first loop iteration, `operation` completes immediately with
+`None`. Because of `select!` pattern matching, the `select!` expression waits 
+
+TODO: Fix this section.
 
 # Per-task concurrency
 
