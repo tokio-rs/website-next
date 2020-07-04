@@ -166,7 +166,7 @@ thousands, if not millions of tasks.
 Tasks spawned by `tokio::spawn` **must** be `'static`. The expression being
 spawned must not borrow any data.
 
-For example, the following example will not compile:
+For example, the following will not compile:
 
 ```rust
 use tokio::task;
@@ -220,7 +220,7 @@ Changing line 7 to `task::spawn(async move {` will instruct the compiler to
 it `'static`.
 
 If a single piece of data must be accessible from more than one task
-concurrently, then it must be wrapped by something like `Arc`.
+concurrently, then it must be shared by a tool such as `Arc`.
 
 ## `Send` bound
 

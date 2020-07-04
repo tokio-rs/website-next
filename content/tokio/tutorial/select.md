@@ -309,7 +309,7 @@ When it comes to each branch's `<handler>`, `select!` guarantees that only a
 single `<handler>` runs. Because of this, each `<handler>` may mutably borrow
 the same data.
 
-For example:
+For example this modifies `out` in both handlers:
 
 ```rust
 use tokio::sync::oneshot;
@@ -321,11 +321,11 @@ async fn main() {
 
     let mut out = String::new();
 
-    // Send values on `tx1` and `tx2`.
-#   tokio::spawn(async {
-#        let _ = tx1.send("one");
-#        let _ = tx2.send("two");
-#    });
+    tokio::spawn(async move {
+        // Send values on `tx1` and `tx2`.
+# let _ = tx1.send("one");
+# let _ = tx2.send("two");
+    });
 
     tokio::select! {
         _ = rx1 => {
@@ -342,8 +342,9 @@ async fn main() {
 
 # Loops
 
-The `select!` macro can be used in loops. We will now go over some examples and
-point out some useful patterns. Let's start with selecting over multiple channels.
+The `select!` macro is often used in loops. This section will go over some
+examples to show common ways of using the `select!` macro in a loop. We start
+by selecting over multiple channels:
 
 ```rust
 use tokio::sync::mpsc;
@@ -365,13 +366,15 @@ async fn main() {
 
         println!("Got {}", msg);
     }
+
+    println!("All channels have been closed.");
 }
 ```
 
 This example selects over the three channel receivers. When a message is
 received on any channel, it is written to STDOUT. When a channel is closed,
 `recv()` returns with `None`. By using pattern matching, the `select!`
-expression continues waiting on the remaining channels. When all channels are
+macro continues waiting on the remaining channels. When all channels are
 closed, the `else` branch is evaluated and the loop is terminated.
 
 When receiving on channels, the fairness feature described earlier is important.
@@ -388,9 +391,9 @@ being processed from **all** channels instead of just the first one.
 ## Resuming an async operation
 
 Now we will show how to run an asynchronous operation across multiple calls to
-`select!`. In the example, we have an MPSC channel of `i32` values an an
+`select!`. In this example, we have an MPSC channel with item type `i32`, and an
 asynchonous function. We want to run the asynchronous function until it
-completes **or** we receive an **even** message on the channel receiver.
+completes or an even integer is received on the channel.
 
 ```rust
 async fn action() {
@@ -431,11 +434,11 @@ operation. Each iteration of the loop uses the same operation instead of issuing
 a new call to `action()`.
 
 The other `select!` branch receives a message from the channel. If the message
-is even, then we are done looping. Otherwise, start the `select!` again.
+is even, we are done looping. Otherwise, start the `select!` again.
 
 This is the first time we use `tokio::pin!`. We aren't going to get into the
-details of pinning yet. The thing to note is that, in order to `.await` a
-**reference**, the value being referenced must be pinned or implement `Unpin`.
+details of pinning yet. The thing to note is that, to `.await` a reference,
+the value being referenced must be pinned or implement `Unpin`.
 
 If we remove the `tokio::pin!` line and try to compile, we get the following
 error:
@@ -467,9 +470,9 @@ This error isn't very clear and we haven't talked much about `Future` yet
 either. For now, think of `Future` as the trait that must be implemented by a
 value in order to call `.await` on it. If you hit an error about `Future` not
 being implemented when attempting to call `.await` on a **reference**, then the
-data probably needs to be pinned.
+future probably needs to be pinned.
 
-Read more about [`Pin`][pin] on the [std][pin] documentation.
+Read more about [`Pin`][pin] on the [standard library][pin].
 
 [pin]: https://doc.rust-lang.org/std/pin/index.html
 
@@ -491,8 +494,12 @@ The logic we want to implement is:
 
 ```rust
 async fn action(input: Option<i32>) -> Option<String> {
-    // If the input is `None`, return `None`
-    let i = input?;
+    // If the input is `None`, return `None`.
+    // This could also be written as `let i = input?;`
+    let i = match input {
+        Some(input) => input,
+        None => return None,
+    };
     // async logic here
 #   Some(i.to_string())
 }
@@ -517,7 +524,7 @@ async fn main() {
             }
             Some(v) = rx.recv() => {
                 if v % 2 == 0 {
-                    // `.set` is on `Pin`.
+                    // `.set` is a method on `Pin`.
                     operation.set(action(Some(v)));
                 }
             }
