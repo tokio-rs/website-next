@@ -292,8 +292,6 @@ async fn race(
         } => {}
         else => {}
     }
-    let socket1 = TcpStream::connect(addr1).await?
-    let socket2 = TcpStream::
 }
 # fn main() {}
 ```
