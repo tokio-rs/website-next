@@ -8,8 +8,8 @@ with Tokio.
 
 # `tokio::select!`
 
-The `tokio::select!` allows waiting on muliple async computations and returns
-when a **single** computation completes.
+The `tokio::select!` macro allows waiting on muliple async computations and
+returns when a **single** computation completes.
 
 For example:
 
@@ -136,7 +136,7 @@ async fn main() {
 ```
 
 The accept loop runs until an error is encountered or `rx` receives a value. The
-`_` pattern indicates that we have no interest in the result of the async
+`_` pattern indicates that we have no interest in the return value of the async
 computation.
 
 ## Return value
@@ -172,7 +172,7 @@ not needed, it is good practice to have the expression evaluate to `()`.
 ## Errors
 
 Using the `?` operator propagages the error from the expression. How this works
-depends on whether `?` is used from an async expression> or from a handler.
+depends on whether `?` is used from an async expression or from a handler.
 Using `?` in an async expression propagates the error out of the async
 expression. This makes the output of the async expression a `Result`. Using `?`
 from a handler immediately propagates the error out of the `select!` expression.
