@@ -66,9 +66,7 @@ When the `select` macro is evaluated, all the `<async expression>`s are
 aggregated and executed concurrently. When an expression completes, the result
 is matched against `<pattern>`. If the result matches the pattern, then all
 remaining async expressions are dropped and `<handler>` is executed. The
-`<handler>` expression has access to any bindings established by `<pattern>`. If
-multiple branches complete simultaneously, one will be picked randomly. This
-provides a level of fairness.
+`<handler>` expression has access to any bindings established by `<pattern>`.
 
 The basic case is `<pattern>` is a variable name, the result of the async
 expression is bound to the variable name and `<handler>` has access to that
@@ -377,16 +375,19 @@ received on any channel, it is written to STDOUT. When a channel is closed,
 macro continues waiting on the remaining channels. When all channels are
 closed, the `else` branch is evaluated and the loop is terminated.
 
-When receiving on channels, the fairness feature described earlier is important.
-When the receive loop processes messages slower than they are pushed into the
-channels, the channels start to fill up. If `select!` **did not** randomly pick
-a branch to check first, on each iteration of the loop, `rx1` would be checked
-first. If `rx1` always contained a new message, the remaining channels would
-never be checked.
+The `select!` macro randomly picks branches to check first for readiness. When
+multiple channels have pending values, a random channel will be picked to
+receive from. This is done to fairly weigh each `select!` branch. When the
+receive loop processes messages slower than they are pushed into the channels,
+the channels start to fill up. If `select!` **did not** randomly pick a branch
+to check first, on each iteration of the loop, `rx1` would be checked first. If
+`rx1` always contained a new message, the remaining channels would never be
+checked.
 
-Because `select!` **randomly** picks the first branch to check. Each iteration
-of the loop will probably check a different branch first. This results messages
-being processed from **all** channels instead of just the first one.
+If when `select!` is evaluated, multiple channels have pending messages, only
+one channel has a value popped. All other channels remain untouched. The
+messages stay in those channels for the next loop iteration. No messages are
+lost.
 
 ## Resuming an async operation
 
