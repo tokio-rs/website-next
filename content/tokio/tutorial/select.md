@@ -375,17 +375,18 @@ closed, the `else` branch is evaluated and the loop is terminated.
 
 The `select!` macro randomly picks branches to check first for readiness. When
 multiple channels have pending values, a random channel will be picked to
-receive from. This is done to fairly weigh each `select!` branch. When the
-receive loop processes messages slower than they are pushed into the channels,
-the channels start to fill up. If `select!` **did not** randomly pick a branch
+receive from. This is to handle the case where the receive loop processes
+messages slower than they are pushed into the channels, meaning that the
+channels start to fill up. If `select!` **did not** randomly pick a branch
 to check first, on each iteration of the loop, `rx1` would be checked first. If
 `rx1` always contained a new message, the remaining channels would never be
 checked.
 
-If when `select!` is evaluated, multiple channels have pending messages, only
-one channel has a value popped. All other channels remain untouched. The
-messages stay in those channels for the next loop iteration. No messages are
-lost.
+[[info]]
+| If when `select!` is evaluated, multiple channels have pending messages, only
+| one channel has a value popped. All other channels remain untouched, and their
+| messages stay in those channels until the next loop iteration. No messages are
+| lost.
 
 ## Resuming an async operation
 
