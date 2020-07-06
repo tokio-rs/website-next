@@ -507,24 +507,31 @@ async fn action(input: Option<i32>) -> Option<String> {
 async fn main() {
     let (mut tx, mut rx) = tokio::sync::mpsc::channel(128);
     
+    let mut done = false;
     let operation = action(None);
     tokio::pin!(operation);
     
     tokio::spawn(async move {
         let _ = tx.send(1).await;
+        let _ = tx.send(3).await;
         let _ = tx.send(2).await;
     });
     
     loop {
         tokio::select! {
-            Some(v) = &mut operation => {
-                println!("GOT = {}", v);
-                return;
+            res = &mut operation, if !done => {
+                done = true;
+
+                if let Some(v) = res {
+                    println!("GOT = {}", v);
+                    return;
+                }
             }
             Some(v) = rx.recv() => {
                 if v % 2 == 0 {
                     // `.set` is a method on `Pin`.
                     operation.set(action(Some(v)));
+                    done = false;
                 }
             }
         }
@@ -540,9 +547,32 @@ Notice how `action` takes `Option<i32>` as an argument. Before we receive the
 first even number, we need to instantiate `operation` to something. We make
 `action` take `Option` and return `Option`. If `None` is passed in, `None` is
 returned. The first loop iteration, `operation` completes immediately with
-`None`. Because of `select!` pattern matching, the `select!` expression waits 
+`None`.
 
-TODO: Fix this section.
+This example uses some new syntax. The first branch includes `, if !done`. This
+is a branch precondition. Before explaining how it works, lets look at what
+happens if the precondition is omitted. Leaving out `, if !done` and running the
+example results in the following output:
+
+```text
+thread 'main' panicked at '`async fn` resumed after completion', src/main.rs:1:55
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+```
+
+This error happens when attempting to use `operation` **after** it has already
+completed. Usually, when using `.await`, the value being awaited is consumed. In
+this example, we await on a reference. This means `operation` is still around
+after it has completed.
+
+To avoid this panic, we must take care to disable the first branch if
+`operation` has completed. The `done` variable is used to track whether or not
+`operation` completed. A `select!` branch may include a **precondition**. This
+precondition is checked **before** `select!` awaits on the branch. If the
+condition evaluates to `false` then the branch is disabled. The `done` variable
+is initialized to `false`. When `operation` completes, `done` is set to `true`.
+The next loop iteration will disable the `operation` branch. When an even
+message is received from the channel, `operation` is reset and `done` is set to
+`false`.
 
 # Per-task concurrency
 
