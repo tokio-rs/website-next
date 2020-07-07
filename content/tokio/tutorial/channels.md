@@ -9,7 +9,8 @@ one task per command. Then the two commands would happen concurrently.
 At first, we might try something like:
 
 ```rust
-use mini_redis::Client;
+# /*
+use mini_redis::client;
 
 #[tokio::main]
 async fn main() {
@@ -28,6 +29,7 @@ async fn main() {
     t1.await.unwrap();
     t2.await.unwrap();
 }
+# */
 ```
 
 This does not compile because both tasks need to access the `client` somehow.
@@ -110,7 +112,8 @@ use tokio::sync::mpsc;
 #[tokio::main]
 async fn main() {
     // Create a new channel with a capacity of at most 32.
-    let (tx, rx) = mpsc::channel(32);
+    let (mut tx, mut rx) = mpsc::channel(32);
+# tx.send(()).await.unwrap();
 
     // ... Rest comes here
 }
@@ -129,10 +132,12 @@ removed by the receiver.
 Sending from multiple tasks is done by **cloning** the `Sender`. For example:
 
 ```rust
+use tokio::sync::mpsc;
+
 #[tokio::main]
 async fn main() {
-    let (tx, rx) = mpsc::channel(32);
-    let tx2 = tx.clone();
+    let (mut tx, mut rx) = mpsc::channel(32);
+    let mut tx2 = tx.clone();
 
     tokio::spawn(async move {
         tx.send("sending from first handle").await;
@@ -167,6 +172,13 @@ connection is established to Redis. Then, received commands are issued via the
 redis connection.
 
 ```rust
+use mini_redis::client;
+# enum Command {
+#    Get { key: String },
+#    Set { key: String, val: bytes::Bytes }
+# }
+# async fn dox() {
+# let (_, mut rx) = tokio::sync::mpsc::channel(10);
 // The `move` keyword is used to **move** ownership of `rx` into the task.
 let manager = tokio::spawn(async move {
     // Establish a connection to the server
@@ -186,15 +198,23 @@ let manager = tokio::spawn(async move {
         }
     }
 });
+# }
 ```
 
 Now, update the two tasks to send commands over the channel instead of issuing
 them directly on the Redis connection.
 
 ```rust
+# #[derive(Debug)]
+# enum Command {
+#    Get { key: String },
+#    Set { key: String, val: bytes::Bytes }
+# }
+# async fn dox() {
+# let (mut tx, _) = tokio::sync::mpsc::channel(10);
 // The `Sender` handles are moved into the tasks. As there are two
 // tasks, we need a second `Sender`.
-let tx2 = tx.clone();
+let mut tx2 = tx.clone();
 
 // Spawn two tasks, one gets a key, the other sets a key
 let t1 = tokio::spawn(async move {
@@ -205,7 +225,7 @@ let t1 = tokio::spawn(async move {
     tx.send(cmd).await.unwrap();
 });
 
-let t2 = tokio::spawn(async {
+let t2 = tokio::spawn(async move {
     let cmd = Command::Set {
         key: "foo".to_string(),
         val: "bar".into(),
@@ -213,15 +233,19 @@ let t2 = tokio::spawn(async {
 
     tx2.send(cmd).await.unwrap();
 });
+# }
 ````
 
 At the bottom of the `main` function, we `.await` the join handles to ensure the
 commands fully complete before the process exits.
 
 ```rust
+# type Jh = tokio::task::JoinHandle<()>;
+# async fn dox(t1: Jh, t2: Jh, manager: Jh) {
 t1.await.unwrap();
 t2.await.unwrap();
 manager.await.unwrap();
+# }
 ```
 
 # Receive responses
@@ -239,7 +263,10 @@ Similar to `mpsc`, `oneshot::channel()` returns a sender and receiver handle.
 ```rust
 use tokio::sync::oneshot;
 
+# async fn dox() {
 let (tx, rx) = oneshot::channel();
+# tx.send(()).unwrap();
+# }
 ```
 
 Unlike `mpsc`, no capacity is specified as the capacity is always one.
@@ -253,6 +280,9 @@ First, update `Command` to include the `Sender`. For convenience, a type alias
 is used to reference the `Sender`.
 
 ```rust
+use tokio::sync::oneshot;
+use bytes::Bytes;
+
 /// Multiple different commands are multiplexed over a single channel.
 #[derive(Debug)]
 enum Command {
@@ -275,6 +305,16 @@ type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
 Now, update the tasks issuing the commands to include the `oneshot::Sender`.
 
 ```rust
+# use tokio::sync::{oneshot, mpsc};
+# #[derive(Debug)]
+# enum Command {
+#     Get { key: String, resp: Responder<Option<bytes::Bytes>> },
+#     Set { key: String, val: Vec<u8>, resp: Responder<()> },
+# }
+# type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
+# fn dox() {
+# let (mut tx, mut rx) = mpsc::channel(10);
+# let mut tx2 = tx.clone();
 let t1 = tokio::spawn(async move {
     let (resp_tx, resp_rx) = oneshot::channel();
     let cmd = Command::Get {
@@ -305,11 +345,21 @@ let t2 = tokio::spawn(async move {
     let res = resp_rx.await;
     println!("GOT = {:?}", res)
 });
+# }
 ```
 
 Finally, update the manager task to send the response over the `oneshot` channel.
 
 ```rust
+# use tokio::sync::{oneshot, mpsc};
+# #[derive(Debug)]
+# enum Command {
+#     Get { key: String, resp: Responder<Option<bytes::Bytes>> },
+#     Set { key: String, val: Vec<u8>, resp: Responder<()> },
+# }
+# type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
+# async fn dox(mut client: mini_redis::client::Client) {
+# let (_, mut rx) = mpsc::channel::<Command>(10);
 while let Some(cmd) = rx.recv().await {
     match cmd {
         Command::Get { key, resp } => {
@@ -324,6 +374,7 @@ while let Some(cmd) = rx.recv().await {
         }
     }
 }
+# }
 ```
 
 Calling `send` on `oneshot::Sender` completes immediately and does **not**
