@@ -348,9 +348,13 @@ Tokio takes care to avoid implicit queuing. A big part of this is the fact that
 async operation are lazy. Consider the following:
 
 ```rust
+# fn async_op() {}
+# fn dox() {
 loop {
     async_op();
 }
+# }
+# fn main() {}
 ```
 
 If the asynchronous operation runs eagerly, the loop will repeatedly queue a new
@@ -364,10 +368,14 @@ snippet is updated to use `.await`, then the loop waits for the operation to
 complete before starting over.
 
 ```rust
+# async fn async_op() {}
+# async fn dox() {
 loop {
     // Will not repeat until `async_op` completes
     async_op().await;
 }
+# }
+# fn main() {}
 ```
 
 Concurrency and queuing must be explicitly introduced. Ways to do this include:
