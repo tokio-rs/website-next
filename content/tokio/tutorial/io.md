@@ -190,11 +190,9 @@ single value implements **both** `AsyncRead` and `AsyncWrite`. Because
 `io::copy` requires `&mut` for both the reader and the writer, the socket cannot
 be used for both arguments.
 
-```rust
-# /*
+```rust,compile_fail
 // This fails to compile
 io::copy(&mut socket, &mut socket).await
-# */
 ```
 
 ## Splitting a reader + writer
