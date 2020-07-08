@@ -8,8 +8,7 @@ one task per command. Then the two commands would happen concurrently.
 
 At first, we might try something like:
 
-```rust
-# /*
+```rust,compile_fail
 use mini_redis::client;
 
 #[tokio::main]
@@ -29,7 +28,6 @@ async fn main() {
     t1.await.unwrap();
     t2.await.unwrap();
 }
-# */
 ```
 
 This does not compile because both tasks need to access the `client` somehow.
