@@ -5,7 +5,7 @@ title: "Async in depth"
 At this point, we have completed a fairly comprehensive tour of asynchronous
 Rust and Tokio. Now we will dig deeper into Rust's asynchronous runtime model.
 At the very beginning of the tutorial, we hinted that asynchronous Rust takes a
-unique approach. Now, we will explain what we meant.
+unique approach. Now, we explain what that means.
 
 # Futures
 
@@ -54,13 +54,13 @@ pub trait Future {
 }
 ```
 
-The `Output` associated type is the type outputed by the future once it
-completes. The [`Pin`][pin] type is how Rust is able to support borrows in
+The [associated type][assoc] `Output` is the type that the future produces once
+it completes. The [`Pin`][pin] type is how Rust is able to support borrows in
 `async` functions. See the [standard library][pin] documentation for more
 details.
 
-Unlike future implementations from other languages, a Rust future does not
-represent a computation happening in the background. Instead, the Rust future
+Unlike how futures are implemented in other languages, a Rust future does not
+represent a computation happening in the background, rather the Rust future
 **is** the computation itself. The owner of the future is responsible for
 advancing the computation by polling the future. This is done by calling
 `Future::poll`.
