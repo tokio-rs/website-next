@@ -84,13 +84,14 @@ struct MyFuture {
 impl Future for MyFuture {
     type Output = &'static str;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context)
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>)
         -> Poll<&'static str>
     {
         if Instant::now() >= self.when {
             println!("Hello world");
             Poll::Ready("done")
         } else {
+            // Ignore this line for now.
             cx.waker().wake_by_ref();
             Poll::Pending
         }
@@ -99,13 +100,106 @@ impl Future for MyFuture {
 
 #[tokio::main]
 async fn main() {
-    let when = Instant::now() +Duration::from_millis(100);
+    let when = Instant::now() + Duration::from_millis(100);
     let future = MyFuture { when };
 
     let out = future.await;
     assert_eq!(out, "done");
 }
 ```
+
+In the main function, we instantiate the future and call `.await` on it. From
+async functions, we may call `.await` on any value that implements `Future`. In
+turn, calling an `async` function returns an anonymous type that implements
+`Future`. In the case of `async fn main()`, the generated future is roughly:
+
+```rust
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
+
+enum AnonMainFuture {
+    // Initialized, never polled
+    State0,
+    // Waiting on `MyFuture`, i.e. the `future.await` line.
+    State1(MyFuture),
+    // The future has completed.
+    Terminated,
+}
+# struct MyFuture { when: Instant };
+# impl Future for MyFuture {
+#     type Output = &'static str;
+#     fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<&'static str> {
+#         unimplemented!();
+#     }
+# }
+
+impl Future for AnonMainFuture {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>)
+        -> Poll<()>
+    {
+        use AnonMainFuture::*;
+
+        loop {
+            match *self {
+                State0 => {
+                    let when = Instant::now() +
+                        Duration::from_millis(100);
+                    let future = MyFuture { when };
+                    *self = State1(future);
+                }
+                State1(ref mut my_future) => {
+                    match Pin::new(my_future).poll(cx) {
+                        Poll::Ready(out) => {
+                            assert_eq!(out, "done");
+                            *self = Terminated;
+                            return Poll::Ready(());
+                        }
+                        Poll::Pending => {
+                            return Poll::Pending;
+                        }
+                    }
+                }
+                Terminated => {
+                    panic!("future polled after completion")
+                }
+            }
+        }
+    }
+}
+```
+
+Rust futures are **state machines**. Here, `AnonMainFuture` is represented as an
+`enum` of the future's possible states. The future starts in the `State0` state.
+When `poll` is invoked, the future attempts to advance its internal state as
+much as possible. If the future is able to complete, `Poll::Ready` is returned
+containing the output of the asynchronous computation.
+
+If the future is **not** able to complete, usually due to resources it is
+waiting on not being ready, then `Poll::Pending` is returned. Receiving
+`Poll::Pending` indicates to the caller that the future will complete at a later
+time and the caller should invoke `poll` again later.
+
+We also see that futures are composed of other futures. Calling `poll` on the
+outer future results in calling the inner future's `poll` function.
+
+# Executors
+
+Asynchronous rust functions return futures. Futures must have `poll` called on
+them to advance their state. Futures are composed of other futures. So, the
+question is, what calls `poll` on the very most outter future?
+
+Recall from earlier, in order to run asynchronous functions, they must either be
+passed to `tokio::spawn` or be the main function annotated with
+`#[tokio::main]`. This results in submitting the generated outer future to the
+Tokio executor. The executor is responsible for calling `Future::poll` on the
+outer future and thus driving the asynchronous computation to completion.
+
+To better understand how this all fits together, lets implement our own minimal
+version of Tokio!
 
 # Wakers
 
