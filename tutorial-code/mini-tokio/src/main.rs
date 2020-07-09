@@ -1,3 +1,7 @@
+//! Demonstrates how to implement a (very) basic asynchronous rust executor and
+//! timer. The goal of this file is to provide some context into how the various
+//! building blocks fit together.
+
 use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
@@ -11,6 +15,12 @@ use futures::task::{self, ArcWake};
 // Used as a channel to queue scheduled tasks.
 use crossbeam::channel;
 
+/// A very basic futures executor based on a channel. When tasks are woken, they
+/// are scheduled by queuing them in the send half of the channel. The executor
+/// waits on the receive half and executes received tasks.
+///
+/// When a task is executed, the send half of the channel is passed along via
+/// the task's Waker.
 struct MiniTokio {
     // Receives scheduled tasks. When a task is scheduled, the associated future
     // is ready to make progress. This usually happens when a resource the task
@@ -22,6 +32,10 @@ struct MiniTokio {
     sender: channel::Sender<Arc<Task>>,
 }
 
+// An equivalent to `tokio::spawn`. When entering the mini-tokio executor, the
+// `CURRENT` thread-local is set to point to that executor's channel's Send
+// half. Then, spawning requires creating the `Task` harness for the given
+// `future` and pushing it into the scheduled queue.
 pub fn spawn<F>(future: F)
 where
     F: Future<Output = ()> + Send + 'static,
@@ -33,9 +47,31 @@ where
     });
 }
 
+// Asynchronous equivalent to `thread::sleep`. Awaiting on this function pauses
+// for the given duration.
+//
+// mini-tokio implements delays by spawning a timer thread that sleeps for the
+// requested duration and notifies the caller once the delay completes. A thread
+// is spawned **per** call to `delay`. This is obviously a terrible
+// implementation strategy and nobody should use this in production. Tokio does
+// not use this strategy. However, it can be implemented with few lines of code,
+// so here we are.
 async fn delay(dur: Duration) {
+    // `delay` is a leaf future. Sometimes, this is refered to as a "resource".
+    // Other resources include sockets and channels. Resources may not be
+    // implemented in terms of `async/await` as they must integrate with some
+    // operating system detail. Because of this, we must manually implement the
+    // `Future`.
+    //
+    // However, it is nice to expose the API as an `async fn`. A useful idiom is
+    // to manually define a private future and then use it from a public `async
+    // fn` API.
     struct Delay {
+        // When to complete the delay.
         when: Instant,
+        // The waker to notify once the delay has completed. The waker must be
+        // accessible by both the timer thread and the future so it is wrapped
+        // with `Arc<Mutex<_>>`
         waker: Option<Arc<Mutex<Waker>>>,
     }
 
@@ -47,9 +83,13 @@ async fn delay(dur: Duration) {
             // timer thread. If the timer thread is already running, ensure the
             // stored `Waker` matches the current task's waker.
             if let Some(waker) = &self.waker {
-                // Check if the stored waker matches the current task's waker
                 let mut waker = waker.lock().unwrap();
 
+                // Check if the stored waker matches the current task's waker.
+                // This is necessary as the `Delay` future instance may move to
+                // a differnt task between calls to `poll`. If this happens, the
+                // waker contained by the given `Context` will differ and we
+                // must update our stored waker to reflect this change.
                 if !waker.will_wake(cx.waker()) {
                     *waker = cx.waker().clone();
                 }
@@ -58,6 +98,7 @@ async fn delay(dur: Duration) {
                 let waker = Arc::new(Mutex::new(cx.waker().clone()));
                 self.waker = Some(waker.clone());
 
+                // This is the first time `poll` is called, spawn the timer thread.
                 thread::spawn(move || {
                     let now = Instant::now();
 
@@ -65,6 +106,8 @@ async fn delay(dur: Duration) {
                         thread::sleep(when - now);
                     }
 
+                    // The duration has elapsed. Notify the caller by invoking
+                    // the waker.
                     let waker = waker.lock().unwrap();
                     waker.wake_by_ref();
                 });
