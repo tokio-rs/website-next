@@ -119,7 +119,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
-enum AnonMainFuture {
+enum MainFuture {
     // Initialized, never polled
     State0,
     // Waiting on `MyFuture`, i.e. the `future.await` line.
@@ -135,13 +135,13 @@ enum AnonMainFuture {
 #     }
 # }
 
-impl Future for AnonMainFuture {
+impl Future for MainFuture {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>)
         -> Poll<()>
     {
-        use AnonMainFuture::*;
+        use MainFuture::*;
 
         loop {
             match *self {
@@ -172,7 +172,7 @@ impl Future for AnonMainFuture {
 }
 ```
 
-Rust futures are **state machines**. Here, `AnonMainFuture` is represented as an
+Rust futures are **state machines**. Here, `MainFuture` is represented as an
 `enum` of the future's possible states. The future starts in the `State0` state.
 When `poll` is invoked, the future attempts to advance its internal state as
 much as possible. If the future is able to complete, `Poll::Ready` is returned
