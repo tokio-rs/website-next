@@ -15,6 +15,39 @@ use futures::task::{self, ArcWake};
 // Used as a channel to queue scheduled tasks.
 use crossbeam::channel;
 
+// Main entry point. A mini-tokio instance is created and a few tasks are
+// spawned. Our mini-tokio implementation only supports spawning tasks and
+// setting delays.
+fn main() {
+    // Create the mini-tokio instance.
+    let mini_tokio = MiniTokio::new();
+
+    // Spawn the root task. All other tasks are spawned from the context of this
+    // root task. No work happens until `mini_tokio.run()` is called.
+    mini_tokio.spawn(async {
+        // Spawn a task
+        spawn(async {
+            // Wait for a little bit of time so that "world" is printed after
+            // "hello"
+            delay(Duration::from_millis(100)).await;
+            println!("world");
+        });
+
+        // Spawn a second task
+        spawn(async {
+            println!("hello");
+        });
+
+        // We haven't implemented executor shutdown, so force the process to exit.
+        delay(Duration::from_millis(200)).await;
+        std::process::exit(0);
+    });
+
+    // Start the mini-tokio executor loop. Scheduled tasks are received and
+    // executed.
+    mini_tokio.run();
+}
+
 /// A very basic futures executor based on a channel. When tasks are woken, they
 /// are scheduled by queuing them in the send half of the channel. The executor
 /// waits on the receive half and executes received tasks.
@@ -30,6 +63,56 @@ struct MiniTokio {
 
     // Send half of the scheduled channel.
     sender: channel::Sender<Arc<Task>>,
+}
+
+impl MiniTokio {
+    /// Initialize a new mini-tokio instance.
+    fn new() -> MiniTokio {
+        let (sender, scheduled) = channel::unbounded();
+
+        MiniTokio {
+            scheduled,
+            sender,
+        }
+    }
+
+    /// Spawn a future onto the mini-tokio instance.
+    ///
+    /// The given future is wrapped with the `Task` harness and pushed into the
+    /// `scheduled` queue. The future will be executed when `run` is called.
+    fn spawn<F>(&self, future: F)
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        Task::spawn(future, &self.sender);
+    }
+
+    /// Run the executor.
+    ///
+    /// This starts the executor loop and runs it indefinitely. No shutdown
+    /// mechanism has been implemented.
+    ///
+    /// Tasks are popped from the `scheduled` channel receiver. Receiving a task
+    /// on the channel signifies the task is ready to be executed. This happens
+    /// when the task is first created and when its waker has been used.
+    fn run(&self) {
+        // Set the CURRENT thread-local to point to the current executor.
+        //
+        // Tokio uses a thread-local variable to implement `tokio::spawn`. When
+        // entering the runtime, the executor stores necessary context with the
+        // thread-local to support spawning new tasks.
+        CURRENT.with(|cell| {
+            *cell.borrow_mut() = Some(self.sender.clone());
+        });
+
+        // The executor loop. Scheduled tasks are received. If the channel is
+        // empty, the thread blocks until a task is received.
+        while let Ok(task) = self.scheduled.recv() {
+            // Execute the task until it either completes or cannot make further
+            // progress and returns `Poll::Pending`.
+            task.poll();
+        }
+    }
 }
 
 // An equivalent to `tokio::spawn`. When entering the mini-tokio executor, the
@@ -113,22 +196,43 @@ async fn delay(dur: Duration) {
                 });
             }
 
+            // Once the waker is stored and the timer thread is started, it is
+            // time to check if the delay has completed. This is done by
+            // checking the current instant. If the duration has elapsed, then
+            // the future has completed and `Poll::Ready` is returned.
             if Instant::now() >= self.when {
                 Poll::Ready(())
             } else {
+                // The duration has not elapsed, the future has not completed so
+                // return `Poll::Pending`.
+                //
+                // The `Future` trait contract requires that when `Pending` is
+                // returned, the future ensures that the given waker is signaled
+                // once the future should be polled again. In our case, by
+                // returning `Pending` here, we are promising that we will
+                // invoke the given waker included in the `Context` argument
+                // once the requested duration has elapsed. We ensure this by
+                // spawning the timer thread above.
+                //
+                // If we forget to invoke the waker, the task will hang
+                // indefinitely.
                 Poll::Pending
             }
         }
     }
 
+    // Create an instance of our `Delay` future.
     let future = Delay {
         when: Instant::now() + dur,
         waker: None,
     };
 
+    // Wait for the duration to complete.
     future.await;
 }
 
+// Used to track the current mini-tokio instance so that the `spawn` function is
+// able to schedule spawned tasks.
 thread_local! {
     static CURRENT: RefCell<Option<channel::Sender<Arc<Task>>>> =
         RefCell::new(None);
@@ -148,36 +252,12 @@ struct Task {
     executor: channel::Sender<Arc<Task>>,
 }
 
-impl MiniTokio {
-    fn new() -> MiniTokio {
-        let (sender, scheduled) = channel::unbounded();
-
-        MiniTokio {
-            scheduled,
-            sender,
-        }
-    }
-
-    fn spawn<F>(&self, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        Task::spawn(future, &self.sender);
-    }
-
-    fn run(&self) {
-        // Set the CURRENT thread-local to point to the current executor
-        CURRENT.with(|cell| {
-            *cell.borrow_mut() = Some(self.sender.clone());
-        });
-
-        while let Ok(task) = self.scheduled.recv() {
-            task.poll();
-        }
-    }
-}
-
 impl Task {
+    // Spawns a new taks with the given future.
+    //
+    // Initializes a new Task harness containing the given future and pushes it
+    // onto `sender`. The receiver half of the channel will get the task and
+    // execute it.
     fn spawn<F>(future: F, sender: &channel::Sender<Arc<Task>>)
     where
         F: Future<Output = ()> + Send + 'static,
@@ -190,10 +270,13 @@ impl Task {
         let _ = sender.send(task);
     }
 
-    // Execute a scheduled task.
+    // Execute a scheduled task. This creates the necessary `task::Context`
+    // containing a waker for the task. This waker pushes the task onto the
+    // mini-redis scheduled channel. The future is then polled with the waker.
     fn poll(self: Arc<Self>) {
         // Get a waker referencing the task.
         let waker = task::waker(self.clone());
+        // Initialize the task context with the waker.
         let mut cx = Context::from_waker(&waker);
 
         // This will never block as only a single thread ever locks the future.
@@ -204,31 +287,14 @@ impl Task {
     }
 }
 
+// The standard library provides low-level, unsafe  APIs for defining wakers.
+// Instead of writing unsafe code, we will use the helpers provided by the
+// `futures` crate to define a waker that is able to schedule our `Task`
+// structure.
 impl ArcWake for Task {
     fn wake_by_ref(arc_self: &Arc<Self>) {
         // Schedule the task for execution. The executor receives from the
         // channel and polls tasks.
         let _ = arc_self.executor.send(arc_self.clone());
     }
-}
-
-fn main() {
-    let mini_tokio = MiniTokio::new();
-
-    mini_tokio.spawn(async {
-        spawn(async {
-            delay(Duration::from_millis(100)).await;
-            println!("world");
-        });
-
-        spawn(async {
-            println!("hello");
-        });
-
-        // We haven't implemented executor shutdown, so force the process to exit.
-        delay(Duration::from_millis(200)).await;
-        std::process::exit(0);
-    });
-
-    mini_tokio.run();
 }
