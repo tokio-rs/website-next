@@ -190,9 +190,9 @@ outer future results in calling the inner future's `poll` function.
 
 Asynchronous rust functions return futures. Futures must have `poll` called on
 them to advance their state. Futures are composed of other futures. So, the
-question is, what calls `poll` on the very most outter future?
+question is, what calls `poll` on the very most outer future?
 
-Recall from earlier, in order to run asynchronous functions, they must either be
+Recall from earlier, to run asynchronous functions, they must either be
 passed to `tokio::spawn` or be the main function annotated with
 `#[tokio::main]`. This results in submitting the generated outer future to the
 Tokio executor. The executor is responsible for calling `Future::poll` on the
