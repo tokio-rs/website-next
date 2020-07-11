@@ -65,6 +65,8 @@ represent a computation happening in the background, rather the Rust future
 advancing the computation by polling the future. This is done by calling
 `Future::poll`.
 
+## Implementing `Future`
+
 Let's implement a very simple future. This future will:
 
 1. Wait until a specific instant in time.
@@ -77,11 +79,11 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
-struct MyFuture {
+struct Delay {
     when: Instant,
 }
 
-impl Future for MyFuture {
+impl Future for Delay {
     type Output = &'static str;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>)
@@ -101,12 +103,14 @@ impl Future for MyFuture {
 #[tokio::main]
 async fn main() {
     let when = Instant::now() + Duration::from_millis(10);
-    let future = MyFuture { when };
+    let future = Delay { when };
 
     let out = future.await;
     assert_eq!(out, "done");
 }
 ```
+
+## Async fn as a Future
 
 In the main function, we instantiate the future and call `.await` on it. From
 async functions, we may call `.await` on any value that implements `Future`. In
@@ -122,13 +126,13 @@ use std::time::{Duration, Instant};
 enum MainFuture {
     // Initialized, never polled
     State0,
-    // Waiting on `MyFuture`, i.e. the `future.await` line.
-    State1(MyFuture),
+    // Waiting on `Delay`, i.e. the `future.await` line.
+    State1(Delay),
     // The future has completed.
     Terminated,
 }
-# struct MyFuture { when: Instant };
-# impl Future for MyFuture {
+# struct Delay { when: Instant };
+# impl Future for Delay {
 #     type Output = &'static str;
 #     fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<&'static str> {
 #         unimplemented!();
@@ -148,7 +152,7 @@ impl Future for MainFuture {
                 State0 => {
                     let when = Instant::now() +
                         Duration::from_millis(10);
-                    let future = MyFuture { when };
+                    let future = Delay { when };
                     *self = State1(future);
                 }
                 State1(ref mut my_future) => {
@@ -198,8 +202,10 @@ passed to `tokio::spawn` or be the main function annotated with
 Tokio executor. The executor is responsible for calling `Future::poll` on the
 outer future and thus driving the asynchronous computation to completion.
 
+## Mini Tokio
+
 To better understand how this all fits together, lets implement our own minimal
-version of Tokio!
+version of Tokio! The full code can be found [here][mini-tokio]
 
 ```rust
 use std::collections::VecDeque;
@@ -214,7 +220,7 @@ fn main() {
 
     mini_tokio.spawn(async {
         let when = Instant::now() + Duration::from_millis(10);
-        let future = MyFuture { when };
+        let future = Delay { when };
 
         let out = future.await;
         assert_eq!(out, "done");
@@ -222,8 +228,8 @@ fn main() {
 
     mini_tokio.run();
 }
-# struct MyFuture { when: Instant }
-# impl Future for MyFuture {
+# struct Delay { when: Instant }
+# impl Future for Delay {
 #     type Output = &'static str;
 #     fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<&'static str> {
 #         Poll::Ready("done")
@@ -264,7 +270,7 @@ impl MiniTokio {
 }
 ```
 
-This runs the async block. A `MyFuture` instance is created with the requested
+This runs the async block. A `Delay` instance is created with the requested
 delay and is awaited on. However, our implementation so far as a major **flaw**.
 Our executor never goes to sleep. The executor continuously loops **all**
 spawned futures and polls them. Most of the time, the futures will not be ready
@@ -302,18 +308,21 @@ for execution. Resources call `wake()` when they transition to a ready state in
 order to notify the executor that polling the task will be able to make
 progress.
 
-We can update `MyFuture` to use wakers:
+## Updating `Delay`
+
+We can update `Delay` to use wakers:
 
 ```rust
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
+use std::thread;
 
-# struct MyFuture {
+# struct Delay {
 #     when: Instant,
 # }
-impl Future for MyFuture {
+impl Future for Delay {
     type Output = &'static str;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>)
@@ -348,6 +357,9 @@ Now, once the requested duration has elapsed, the calling task is notified and
 the executor can ensure the task is scheduled again. The next step is to update
 mini-tokio to listen for wake notifications.
 
+There are still a few remaining issues with our `Delay` implementation. We will
+fix them later.
+
 [[warning]]
 | When a future returns `Poll::Pending`, it **must** ensure the waker is
 | signalled at some point in the future. Forgetting to do this results
@@ -356,8 +368,101 @@ mini-tokio to listen for wake notifications.
 | Forgetting to wake a task after returning `Poll::Pending` is a common
 | source of bugs.
 
-# Cancellation
+## Updating Mini Tokio
+
+The next step is updating Mini Tokio to receive waker notifications. We want the
+executor to only run tasks when they are woken. To do this, Mini Tokio
+implements its waker. When the waker is invoked, its associated task is queued
+to be executed. This waker is passed to the root future when it is polled.
+
+Mini Tokio is updated to to use a channel to store scheduled tasks. Channels
+allow tasks to be queued for execution from any thread. Wakers must be `Send`
+and `Sync`. Channels support these requirements.
+
+Add the following dependency to your `Cargo.toml` to pull in channels.
+
+```toml
+crossbeam = "0.7"
+```
+
+Then, update the `MiniTokio` struct.
+
+```rust
+use crossbeam::channel;
+use std::sync::Arc;
+
+struct MiniTokio {
+    scheduled: channel::Receiver<Arc<Task>>,
+    sender: channel::Sender<Arc<Task>>,
+}
+
+struct Task {
+    // This will be filled in soon.
+}
+```
+
+Wakers are `Sync` and can be cloned. When `wake` is called, the task must be
+scheduled for execution. To implement this, we have a channel. When the `wake()`
+is called on the waker, the task is pushed into the send have of the channel.
+Our `Task` structure will implement the wake logic. To do this, it needs to
+contain both the spawned future and the channel send half.
+
+```rust
+# use std::future::Future;
+# use std::pin::Pin;
+# use std::sync::{Arc, Mutex};
+# use crossbeam::channel;
+struct Task {
+    future: Mutex<Pin<Box<dyn Future<Output = ()> + Send>>>,
+    executor: channel::Sender<Arc<Task>>,
+}
+
+impl Task {
+    fn schedule(self: &Arc<Self>) {
+        self.executor.send(self.clone());
+    }
+}
+```
+
+To schedule the task, the `Arc` is cloned and sent through the channel. Now, we
+need to hook our `schedule` function with `std::task::Waker`. The standard
+library provides a low-level API to do this using [manual vtable
+construction][vtable]. This strategy provides maximum flexibility to
+implementors, but requires a bunch of unsafe boilerplate code. Instead of using
+`RawWakerVTable` directly, we will use the [`ArcWake`] utility provided by the
+[`futures`] crate. This allows us to implement a simple trait to expose our
+`Task` struct as a waker.
+
+Add the following dependency to your `Cargo.toml` to pull in `futures`.
+
+```toml
+futures = "0.3"
+```
+
+Then implement `futures::task::ArcWake`.
+
+```rust
+use futures::task::ArcWake;
+use std::sync::Arc;
+# struct Task {}
+# impl Task {
+#     fn schedule(self: &Arc<Self>) {}
+# }
+impl ArcWake for Task {
+    fn wake_by_ref(arc_self: &Arc<Self>) {
+        arc_self.schedule();
+    }
+}
+```
+
+Now, when the timer thread above calls `waker.wake()`, the task is pushed into
+the channel. Next, we implement receiving and executing the tasks in the
+`MiniTokio::run()` function.
 
 [trait]: https://doc.rust-lang.org/std/future/trait.Future.html
 [pin]: https://doc.rust-lang.org/std/pin/index.html
 [`Waker`]: https://doc.rust-lang.org/std/task/struct.Waker.html
+[mini-tokio]: #
+[vtable]: https://doc.rust-lang.org/std/task/struct.RawWakerVTable.html
+[`ArcWake`]: https://docs.rs/futures/0.3/futures/task/trait.ArcWake.html
+[`futures`]: https://docs.rs/futures/
