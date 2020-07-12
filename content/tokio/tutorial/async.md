@@ -413,6 +413,12 @@ contain both the spawned future and the channel send half.
 # use std::sync::{Arc, Mutex};
 # use crossbeam::channel;
 struct Task {
+    // The `Mutex` is to make `Task` implement `Sync`. Only
+    // one thread accesses `future` at any given time. The
+    // `Mutex` is not required for correctness. Real Tokio
+    // does not use a mutex here,  but real Tokio has
+    // more lines of code than can fit in a single tutorial
+    // page.
     future: Mutex<Pin<Box<dyn Future<Output = ()> + Send>>>,
     executor: channel::Sender<Arc<Task>>,
 }
@@ -455,9 +461,205 @@ impl ArcWake for Task {
 }
 ```
 
-Now, when the timer thread above calls `waker.wake()`, the task is pushed into
-the channel. Next, we implement receiving and executing the tasks in the
+When the timer thread above calls `waker.wake()`, the task is pushed into the
+channel. Next, we implement receiving and executing the tasks in the
 `MiniTokio::run()` function.
+
+```rust
+# use crossbeam::channel;
+# use futures::task::{self, ArcWake};
+# use std::future::Future;
+# use std::pin::Pin;
+# use std::sync::{Arc, Mutex};
+# use std::task::{Context};
+# struct MiniTokio {
+#   scheduled: channel::Receiver<Arc<Task>>,
+# }
+# struct Task {
+#   future: Mutex<Pin<Box<dyn Future<Output = ()> + Send>>>,
+# }
+# impl ArcWake for Task {
+#   fn wake_by_ref(arc_self: &Arc<Self>) {}
+# }
+impl MiniTokio {
+    fn run(&self) {
+        while let Ok(task) = self.scheduled.recv() {
+            task.poll();
+        }
+    }
+}
+
+impl Task {
+    fn poll(self: Arc<Self>) {
+        // Create a waker from the `Task` instance. This
+        // uses the `ArcWake` impl from above.
+        let waker = task::waker(self.clone());
+        let mut cx = Context::from_waker(&waker);
+
+        // No other thread ever tries to lock the future
+        let mut future = self.future.try_lock().unwrap();
+
+        // Poll the future
+        let _ = future.as_mut().poll(&mut cx);
+    }
+}
+```
+
+Two things are happening here. First, `MiniTokio::run()` is implemented. The
+function runs in a loop receiving scheduled tasks from the channel. As tasks are
+pushed into the channel when they are woken, these tasks are able to make
+progress when executed.
+
+The `Task::poll()` function creates the waker using the `ArcWake` utility from
+the `futures` crate. The waker is used to create a `task::Context`. That
+`task::Context` is passed to `poll`.
+
+# Summary
+
+We have now seen an end-to-end example of how asynchronous Rust works. Rust's
+`async/await` feature is backed by traits. This allows third-party crates, like
+Tokio, to provide the execution details.
+
+* Asynchronous Rust operation are lazy and require a caller to poll them.
+* Wakers are passed to futures in order to link a future to the task calling it.
+* When a resource is **not** ready to complete an operation, `Poll::Pending` is
+  returned and the task's waker is recorded.
+* When the resource becomes ready, the task's waker is notified.
+* The executor receives the notification and schedule's the task to execute.
+* The task is polled again, this time the resource is ready and the task makes
+  progress.
+
+# A few loose ends
+
+Recall when we were implementing the `Delay` future, we said there were a few
+more things to fix. Rust's asynchronous model allows a single future to migrate
+across tasks while it executes. Consider the following:
+
+```rust
+use futures::future::poll_fn;
+use std::future::Future;
+use std::pin::Pin;
+# use std::task::{Context, Poll};
+# use std::time::{Duration, Instant};
+# struct Delay { when: Instant }
+# impl Future for Delay {
+#   type Output = ();
+#   fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
+#       Poll::Pending
+#   }  
+# }
+
+#[tokio::main]
+async fn main() {
+    let when = Instant::now() + Duration::from_millis(10);
+    let mut delay = Some(Delay { when });
+
+    poll_fn(move |cx| {
+        let mut delay = delay.take().unwrap();
+        let res = Pin::new(&mut delay).poll(cx);
+        assert!(res.is_pending());
+        tokio::spawn(async move {
+            delay.await;
+        });
+
+        Poll::Ready(())
+    }).await;
+}
+```
+
+The `poll_fn` function creates a `Future` instance using a closure. The snippet
+above creates a `Delay` instance, polls it once, then sends the `Delay` instance
+to a new task where it is awaited. In this example, `Delay::poll` is called more
+than once with **different** `Waker` instances. Our earlier implementation did
+not handle this case and the above snippet would never complete.
+
+When implementing a future, it is critical to assume that each call to `poll`
+**could** supply a different `Waker` instance. The poll function must update any
+previously recorded waker with the new one.
+
+To fix our earlier implementation, we would do something like this:
+
+```rust
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll, Waker};
+use std::thread;
+use std::time::{Duration, Instant};
+
+struct Delay {
+    when: Instant,
+    waker: Option<Arc<Mutex<Waker>>>,
+}
+
+impl Future for Delay {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        // First, if this is the first time the future is called, spawn the
+        // timer thread. If the timer thread is already running, ensure the
+        // stored `Waker` matches the current task's waker.
+        if let Some(waker) = &self.waker {
+            let mut waker = waker.lock().unwrap();
+
+            // Check if the stored waker matches the current task's waker.
+            // This is necessary as the `Delay` future instance may move to
+            // a differnt task between calls to `poll`. If this happens, the
+            // waker contained by the given `Context` will differ and we
+            // must update our stored waker to reflect this change.
+            if !waker.will_wake(cx.waker()) {
+                *waker = cx.waker().clone();
+            }
+        } else {
+            let when = self.when;
+            let waker = Arc::new(Mutex::new(cx.waker().clone()));
+            self.waker = Some(waker.clone());
+
+            // This is the first time `poll` is called, spawn the timer thread.
+            thread::spawn(move || {
+                let now = Instant::now();
+
+                if now < when {
+                    thread::sleep(when - now);
+                }
+
+                // The duration has elapsed. Notify the caller by invoking
+                // the waker.
+                let waker = waker.lock().unwrap();
+                waker.wake_by_ref();
+            });
+        }
+
+        // Once the waker is stored and the timer thread is started, it is
+        // time to check if the delay has completed. This is done by
+        // checking the current instant. If the duration has elapsed, then
+        // the future has completed and `Poll::Ready` is returned.
+        if Instant::now() >= self.when {
+            Poll::Ready(())
+        } else {
+            // The duration has not elapsed, the future has not completed so
+            // return `Poll::Pending`.
+            //
+            // The `Future` trait contract requires that when `Pending` is
+            // returned, the future ensures that the given waker is signaled
+            // once the future should be polled again. In our case, by
+            // returning `Pending` here, we are promising that we will
+            // invoke the given waker included in the `Context` argument
+            // once the requested duration has elapsed. We ensure this by
+            // spawning the timer thread above.
+            //
+            // If we forget to invoke the waker, the task will hang
+            // indefinitely.
+            Poll::Pending
+        }
+    }
+}
+```
+
+It is a bit involved, but the idea is, on each call to `poll`, the future checks
+if the supplied waker matches the previously recorded waker. If the two wakers
+match, then there is nothing else to do. If they do not match, then the recorded
+waker must be updated.
 
 [trait]: https://doc.rust-lang.org/std/future/trait.Future.html
 [pin]: https://doc.rust-lang.org/std/pin/index.html
