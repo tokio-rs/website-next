@@ -114,7 +114,73 @@ async fn main() {
 
 ## The `Future` implementation
 
-TODO: Show how select is implemented as a Future
+To help better understand how `select!` works, lets look at a hypothetical
+`Future` implementation would look like. This is a simplified version. In
+practice, `select!` includes additional functionality like randomly selecting
+the branch to poll first.
+
+```rust
+use tokio::sync::oneshot;
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+struct MySelect {
+    rx1: oneshot::Receiver<&'static str>,
+    rx2: oneshot::Receiver<&'static str>,
+}
+
+impl Future for MySelect {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        if let Poll::Ready(val) = Pin::new(&mut self.rx1).poll(cx) {
+            println!("rx1 completed first with {:?}", val);
+            return Poll::Ready(());
+        }
+
+        if let Poll::Ready(val) = Pin::new(&mut self.rx2).poll(cx) {
+            println!("rx2 completed first with {:?}", val);
+            return Poll::Ready(());
+        }
+
+        Poll::Pending
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let (tx1, rx1) = oneshot::channel();
+    let (tx2, rx2) = oneshot::channel();
+
+    // use tx1 and tx2
+# tx1.send("one").unwrap();
+# tx2.send("two").unwrap();
+
+    MySelect {
+        rx1,
+        rx2,
+    }.await;
+}
+```
+
+The `MySelect` future contains the futures from each branch. When `MySelect` is
+polled, the first branch is polled. If it is ready, the value is used and
+`MySelect` completes. After `.await` receives the output from a future, the
+future is dropped. This results in the futures for both branches to be dropped.
+As one branch did not complete, the operation is effectively cancelled.
+
+Remember from the previous section:
+
+> When a future returns `Poll::Pending`, it **must** ensure the waker is
+> signalled at some point in the future. Forgetting to do this results in the
+> task hanging indefinitely.
+
+There is no explicit usage of the `Context` argument in the `MySelect`
+implementation. Instead, the waker requirement is met by passing `cx` to the
+inner futures. As the inner future must also meet the waker requirement, by only
+returning `Poll::Pending` when receiving `Poll::Pending` from an inner future,
+`MySelect` also meets the waker requirement.
 
 # Syntax
 
