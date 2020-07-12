@@ -7,8 +7,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
-use std::time::{Duration, Instant};
 use std::thread;
+use std::time::{Duration, Instant};
 // A utility that allows us to implement a `std::task::Waker` without having to
 // use `unsafe` code.
 use futures::task::{self, ArcWake};
@@ -70,10 +70,7 @@ impl MiniTokio {
     fn new() -> MiniTokio {
         let (sender, scheduled) = channel::unbounded();
 
-        MiniTokio {
-            scheduled,
-            sender,
-        }
+        MiniTokio { scheduled, sender }
     }
 
     /// Spawn a future onto the mini-tokio instance.
