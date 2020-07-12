@@ -49,9 +49,72 @@ The branch that **does not** complete is dropped. In the example, the
 computation is awaiting the `oneshot::Receiver` for each channel. The
 `oneshot::Receiver` for the channel that did not complete yet is dropped.
 
-[[info]]
-| In asynchronous Rust, dropping an asynchronous computation before it completes
-| is used to signal cancellation. The next page will cover this in more depth.
+## Cancellation
+
+With asynchronous Rust, cancellation is performed by dropping a future. Recall
+from ["Async in depth"][async], async Rust operation are implemented using
+futures and futures are lazy. The operation only proceeds when the future is
+polled. If the future is dropped, the operation cannot proceed because all
+associated state has been dropped.
+
+That said, sometimes an asynchronous operation will spawn background tasks or
+start other operation that run in the background. For example, in the above
+example, a task is spawned to send a message back. Usually, the task will
+perform some computation to generate the value.
+
+Futures or other types can implement `Drop` to cleanup background resources.
+Tokio's `oneshot::Receier` implements `Drop` by sending a closed notification to
+the `Sender` half. The sender half can receive this notification and abort the
+in-progress operation by dropping it.
+
+
+```rust
+use tokio::sync::oneshot;
+
+async fn some_operation() -> String {
+    // Compute value here
+# "wut".to_string()
+}
+
+#[tokio::main]
+async fn main() {
+    let (mut tx1, rx1) = oneshot::channel();
+    let (tx2, rx2) = oneshot::channel();
+
+    tokio::spawn(async {
+        // Select on the operation and the oneshot's
+        // `closed()` notification.
+        tokio::select! {
+            val = some_operation() => {
+                let _ = tx1.send(val);
+            }
+            _ = tx1.closed() => {
+                // `some_operation()` is canceled, the
+                // task completes and `tx1` is dropped.
+            }
+        }
+    });
+
+    tokio::spawn(async {
+        let _ = tx2.send("two");
+    });
+
+    tokio::select! {
+        val = rx1 => {
+            println!("rx1 completed first with {:?}", val);
+        }
+        val = rx2 => {
+            println!("rx2 completed first with {:?}", val);
+        }
+    }
+}
+```
+
+[async]: ../async
+
+## The `Future` implementation
+
+TODO: Show how select is implemented as a Future
 
 # Syntax
 
