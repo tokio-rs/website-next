@@ -192,7 +192,7 @@ outer future results in calling the inner future's `poll` function.
 
 # Executors
 
-Asynchronous rust functions return futures. Futures must have `poll` called on
+Asynchronous Rust functions return futures. Futures must have `poll` called on
 them to advance their state. Futures are composed of other futures. So, the
 question is, what calls `poll` on the very most outer future?
 
@@ -200,12 +200,12 @@ Recall from earlier, to run asynchronous functions, they must either be
 passed to `tokio::spawn` or be the main function annotated with
 `#[tokio::main]`. This results in submitting the generated outer future to the
 Tokio executor. The executor is responsible for calling `Future::poll` on the
-outer future and thus driving the asynchronous computation to completion.
+outer future, driving the asynchronous computation to completion.
 
 ## Mini Tokio
 
 To better understand how this all fits together, lets implement our own minimal
-version of Tokio! The full code can be found [here][mini-tokio]
+version of Tokio! The full code can be found [here][mini-tokio].
 
 ```rust
 use std::collections::VecDeque;
@@ -282,16 +282,16 @@ progress. This happens when a resource that the task is blocked on becomes ready
 to perform the requested operation. If the task wants to read data from a TCP
 socket, then we only want to poll the task when the TCP socket has received
 data. In our case, the task is blocked on the given `Instant` being reached.
-Ideally, mini-tokio would only poll the task once that instance in time has
+Ideally, mini-tokio would only poll the task once that instant in time has
 passed.
 
-To achieve this, when a task polls a resource, and the resource is **not**
-ready, the resource will notify the task once it transitions to a ready state.
+To achieve this, when a resource is polled, and the resource is **not** ready,
+the resource will send a notification once it transitions into a ready state.
 
 # Wakers
 
 Wakes are the missing piece. This is the system by which a resource is able to
-notify the waiting task that the resource has become ready to complete an
+notify the waiting task that the resource has become ready to continue some
 operation.
 
 Let's look at the `Future::poll` definition again:
@@ -304,9 +304,8 @@ fn poll(self: Pin<&mut Self>, cx: &mut Context)
 The `Context` argument to `poll` has a `waker()` method. This method returns a
 [`Waker`] bound to the current task. The [`Waker`] has `wake()` method. Calling
 this method signals to the executor that the associated task should be scheduled
-for execution. Resources call `wake()` when they transition to a ready state in
-order to notify the executor that polling the task will be able to make
-progress.
+for execution. Resources call `wake()` when they transition to a ready state to
+notify the executor that polling the task will be able to make progress.
 
 ## Updating `Delay`
 
@@ -319,9 +318,9 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use std::thread;
 
-# struct Delay {
-#     when: Instant,
-# }
+struct Delay {
+    when: Instant,
+}
 impl Future for Delay {
     type Output = &'static str;
 
@@ -361,7 +360,7 @@ There are still a few remaining issues with our `Delay` implementation. We will
 fix them later.
 
 [[warning]]
-| When a future returns `Poll::Pending`, it **must** ensure the waker is
+| When a future returns `Poll::Pending`, it **must** ensure that the waker is
 | signalled at some point in the future. Forgetting to do this results
 | in the task hanging indefinitely.
 |
@@ -371,13 +370,15 @@ fix them later.
 ## Updating Mini Tokio
 
 The next step is updating Mini Tokio to receive waker notifications. We want the
-executor to only run tasks when they are woken. To do this, Mini Tokio
-implements its waker. When the waker is invoked, its associated task is queued
-to be executed. This waker is passed to the root future when it is polled.
+executor to only run tasks when they are woken, and to do this, Mini Tokio will
+provide its own waker. When the waker is invoked, its associated task is queued
+to be executed. Mini-Tokio passes this waker to the future when it polls the
+future.
 
-Mini Tokio is updated to to use a channel to store scheduled tasks. Channels
+The updated Mini Tokio will use a channel to store scheduled tasks. Channels
 allow tasks to be queued for execution from any thread. Wakers must be `Send`
-and `Sync`. Channels support these requirements.
+and `Sync`, so we use the channel from the crossbeam crate, as the standard
+library channel is not `Sync`.
 
 Add the following dependency to your `Cargo.toml` to pull in channels.
 
@@ -416,7 +417,7 @@ struct Task {
     // The `Mutex` is to make `Task` implement `Sync`. Only
     // one thread accesses `future` at any given time. The
     // `Mutex` is not required for correctness. Real Tokio
-    // does not use a mutex here,  but real Tokio has
+    // does not use a mutex here, but real Tokio has
     // more lines of code than can fit in a single tutorial
     // page.
     future: Mutex<Pin<Box<dyn Future<Output = ()> + Send>>>,
@@ -521,11 +522,11 @@ We have now seen an end-to-end example of how asynchronous Rust works. Rust's
 Tokio, to provide the execution details.
 
 * Asynchronous Rust operation are lazy and require a caller to poll them.
-* Wakers are passed to futures in order to link a future to the task calling it.
+* Wakers are passed to futures to link a future to the task calling it.
 * When a resource is **not** ready to complete an operation, `Poll::Pending` is
   returned and the task's waker is recorded.
 * When the resource becomes ready, the task's waker is notified.
-* The executor receives the notification and schedule's the task to execute.
+* The executor receives the notification and schedules the task to execute.
 * The task is polled again, this time the resource is ready and the task makes
   progress.
 
@@ -577,7 +578,7 @@ When implementing a future, it is critical to assume that each call to `poll`
 **could** supply a different `Waker` instance. The poll function must update any
 previously recorded waker with the new one.
 
-To fix our earlier implementation, we would do something like this:
+To fix our earlier implementation, we could do something like this:
 
 ```rust
 use std::future::Future;
