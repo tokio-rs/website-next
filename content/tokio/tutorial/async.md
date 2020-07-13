@@ -663,6 +663,44 @@ if the supplied waker matches the previously recorded waker. If the two wakers
 match, then there is nothing else to do. If they do not match, then the recorded
 waker must be updated.
 
+## `Notify` utility
+
+We demonstrated how a `Delay` future could be implemented by hand using wakers.
+Wakers are the foundation of how asynchronous Rust works. Usually, it is not
+necessary to drop down to that level. For example, in the case of `Delay`, we
+could implement it entirely with `async/await` by using the
+[`tokio::sync::Notify`][notify] utility. This utility provides a basic task
+notification mechamism. It handles the details of wakers, including making sure
+the recorded waker matches the current task.
+
+Using [`Notify`][notify], we can implement a `delay` function using
+`async/await` like this:
+
+```rust
+use tokio::sync::Notify;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+async fn delay(dur: Duration) {
+    let when = Instant::now() + dur;
+    let notify = Arc::new(Notify::new());
+    let notify2 = notify.clone();
+
+    thread::spawn(async move {
+        let now = Instant::now();
+
+        if now < when {
+            thread::sleep(when - now);
+        }
+
+        notify.notify();
+    });
+
+
+    notify.notified().await;
+}
+```
+
 [trait]: https://doc.rust-lang.org/std/future/trait.Future.html
 [pin]: https://doc.rust-lang.org/std/pin/index.html
 [`Waker`]: https://doc.rust-lang.org/std/task/struct.Waker.html
@@ -670,3 +708,4 @@ waker must be updated.
 [vtable]: https://doc.rust-lang.org/std/task/struct.RawWakerVTable.html
 [`ArcWake`]: https://docs.rs/futures/0.3/futures/task/trait.ArcWake.html
 [`futures`]: https://docs.rs/futures/
+[notify]: https://docs.rs/tokio/0.2/tokio/sync/struct.Notify.html
