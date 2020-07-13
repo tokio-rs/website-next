@@ -380,6 +380,19 @@ allow tasks to be queued for execution from any thread. Wakers must be `Send`
 and `Sync`, so we use the channel from the crossbeam crate, as the standard
 library channel is not `Sync`.
 
+[[info]]
+| The `Send` and `Sync` traits are marker traits related to concurrency
+| provided by Rust. Types that can be **sent** to a different thread are
+| `Send`. Many types are `Send`, but something like [`Rc`] is not. Types
+| that can be **concurrently** used are `Sync`. A type can be `Send` but
+| not `Sync` (e.g. [`Cell`]).
+|
+| For more details, see the related [chapter in the Rust book][ch].
+
+[`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
+[`Cell`]: https://doc.rust-lang.org/std/cell/struct.Cell.html
+[ch]: https://doc.rust-lang.org/book/ch16-04-extensible-concurrency-sync-and-send.html
+
 Add the following dependency to your `Cargo.toml` to pull in channels.
 
 ```toml
