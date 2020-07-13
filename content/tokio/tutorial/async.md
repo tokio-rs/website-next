@@ -383,9 +383,11 @@ library channel is not `Sync`.
 [[info]]
 | The `Send` and `Sync` traits are marker traits related to concurrency
 | provided by Rust. Types that can be **sent** to a different thread are
-| `Send`. Many types are `Send`, but something like [`Rc`] is not. Types
-| that can be **concurrently** used are `Sync`. A type can be `Send` but
-| not `Sync` (e.g. [`Cell`]).
+| `Send`. Most types are `Send`, but something like [`Rc`] is not. Types
+| that can be **concurrently** accessed through immutable references are
+| `Sync`. A type can be `Send` but not `Sync` — a good example is
+| [`Cell`], which can be modified through an immutable reference, and
+| is thus not safe to access concurrently.
 |
 | For more details, see the related [chapter in the Rust book][ch].
 
@@ -684,7 +686,7 @@ necessary to drop down to that level. For example, in the case of `Delay`, we
 could implement it entirely with `async/await` by using the
 [`tokio::sync::Notify`][notify] utility. This utility provides a basic task
 notification mechamism. It handles the details of wakers, including making sure
-the recorded waker matches the current task.
+that the recorded waker matches the current task.
 
 Using [`Notify`][notify], we can implement a `delay` function using
 `async/await` like this:
