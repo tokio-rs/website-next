@@ -445,13 +445,13 @@ impl Task {
 ```
 
 To schedule the task, the `Arc` is cloned and sent through the channel. Now, we
-need to hook our `schedule` function with `std::task::Waker`. The standard
-library provides a low-level API to do this using [manual vtable
+need to hook our `schedule` function with [`std::task::Waker`][`Waker`]. The
+standard library provides a low-level API to do this using [manual vtable
 construction][vtable]. This strategy provides maximum flexibility to
 implementors, but requires a bunch of unsafe boilerplate code. Instead of using
-`RawWakerVTable` directly, we will use the [`ArcWake`] utility provided by the
-[`futures`] crate. This allows us to implement a simple trait to expose our
-`Task` struct as a waker.
+[`RawWakerVTable`][vtable] directly, we will use the [`ArcWake`] utility
+provided by the [`futures`] crate. This allows us to implement a simple trait to
+expose our `Task` struct as a waker.
 
 Add the following dependency to your `Cargo.toml` to pull in `futures`.
 
@@ -459,7 +459,7 @@ Add the following dependency to your `Cargo.toml` to pull in `futures`.
 futures = "0.3"
 ```
 
-Then implement `futures::task::ArcWake`.
+Then implement [`futures::task::ArcWake`][`ArcWake`].
 
 ```rust
 use futures::task::ArcWake;
@@ -524,7 +524,7 @@ function runs in a loop receiving scheduled tasks from the channel. As tasks are
 pushed into the channel when they are woken, these tasks are able to make
 progress when executed.
 
-The `Task::poll()` function creates the waker using the `ArcWake` utility from
+The `Task::poll()` function creates the waker using the [`ArcWake`] utility from
 the `futures` crate. The waker is used to create a `task::Context`. That
 `task::Context` is passed to `poll`.
 
