@@ -572,7 +572,8 @@ The `poll_fn` function creates a `Future` instance using a closure. The snippet
 above creates a `Delay` instance, polls it once, then sends the `Delay` instance
 to a new task where it is awaited. In this example, `Delay::poll` is called more
 than once with **different** `Waker` instances. Our earlier implementation did
-not handle this case and the above snippet would never complete.
+not handle this case and the spawned task would sleep forever, as the wrong
+task is notified.
 
 When implementing a future, it is critical to assume that each call to `poll`
 **could** supply a different `Waker` instance. The poll function must update any
