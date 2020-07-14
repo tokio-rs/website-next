@@ -394,8 +394,10 @@ for signalling the waker. Because we didn't implement the timer thread yet, we
 signalled the waker inline. Doing so will result in the future being immediately
 re-scheduled, executed again, and probably not be ready to complete.
 
-Notice that the contract does not require signalling the waker to imply the
-future is able to make progress. False positives are permitted.
+Notice that you are allowed to signal the waker more often than necessary. In
+this particular case, we signal the waker even though we are not ready to
+continue the operation at all. There is nothing wrong with this besides some
+wasted CPU cycles.
 
 ## Updating Mini Tokio
 
