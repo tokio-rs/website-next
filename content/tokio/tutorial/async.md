@@ -397,7 +397,8 @@ re-scheduled, executed again, and probably not be ready to complete.
 Notice that you are allowed to signal the waker more often than necessary. In
 this particular case, we signal the waker even though we are not ready to
 continue the operation at all. There is nothing wrong with this besides some
-wasted CPU cycles.
+wasted CPU cycles, however, this particular implementation will result in a busy
+loop.
 
 ## Updating Mini Tokio
 
