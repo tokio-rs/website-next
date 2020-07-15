@@ -80,6 +80,17 @@ $footer-color: white;
   @return color.scale($color, $lightness: -15%);
 }
 
+@function lighten($color) {
+  @return color.scale($color, $lightness: 93%);
+}
+
+a,
+a:hover,
+a:focus,
+a:active {
+  outline: none;
+}
+
 .navbar {
   .navbar-brand {
     background-color: black;
@@ -108,22 +119,23 @@ $footer-color: white;
       width: 1.8rem;
     }
   }
+
   @include mobile {
     .navbar-menu {
       display: block;
       z-index: -1;
-  
+
       position: absolute;
       bottom: 0;
       left: 0;
       right: 0;
 
-      transition: transform .2s ease-in-out;
+      transition: transform 0.2s ease-in-out;
     }
     .navbar-menu.is-active {
       opacity: 1;
       transform: translateY(100%);
-      transition: transform .2s ease-in-out;
+      transition: transform 0.2s ease-in-out;
       pointer-events: auto;
     }
     .navbar-end {
@@ -135,7 +147,8 @@ $footer-color: white;
         }
       }
 
-      .tk-social, .tk-social.navbar-icon {
+      .tk-social,
+      .tk-social.navbar-icon {
         align-items: center;
         display: inline-block;
         padding-left: 1.7rem;
@@ -302,6 +315,9 @@ $footer-color: white;
       width: 70%;
       max-width: 8rem;
       margin: 0 auto;
+    }
+    .aws img {
+      transform: scale(70%);
     }
   }
 }
@@ -491,19 +507,116 @@ $footer-color: white;
 }
 
 .tk-docs {
-  // min-height: 500px;
-
   .tk-docs-nav {
     background-color: $light-gray;
+
+    @include mobile {
+      padding: 0;
+    }
+
+    @include tablet {
+      padding: 4rem 0 0 1rem;
+    }
   }
 
   .menu {
     font-size: $menu-font-size;
-    position: sticky;
-    top: 4rem;
-    max-width: 260px;
-    margin-left: auto;
-    padding-bottom: 4rem;
+    position: relative;
+    z-index: 2;
+
+    @include tablet {
+      position: sticky;
+      top: 4rem;
+      max-width: 280px;
+      margin-left: auto;
+      padding-bottom: 4rem;
+    }
+
+    @include mobile {
+      .tk-toc {
+        position: relative;
+        padding: 0.75rem;
+        z-index: 3;
+        font-size: 1.1rem;
+        font-weight: 500;
+        background-color: $light-gray;
+
+        a {
+          display: block;
+          position: relative;
+          width: 100%;
+          color: black;
+
+          .icon {
+            position: absolute;
+            right: 15px;
+            transform: scale(0.8);
+          }
+        }
+
+        .tk-arrow {
+          width: 13px;
+          height: 13px;
+          display: inline-block;
+          position: relative;
+          bottom: -5px;
+          right: -10px;
+          transition: 0.4s ease;
+          margin-top: 2px;
+          text-align: left;
+          transform: rotate(45deg);
+          // float: right;
+
+          &:before,
+          &:after {
+            position: absolute;
+            content: "";
+            display: "inline-block";
+            width: 12px;
+            height: 3px;
+            background-color: black;
+            transition: 0.4s ease;
+          }
+
+          &:after {
+            position: absolute;
+            transform: rotate(90deg);
+            top: -5px;
+            left: 5px;
+          }
+        }
+
+        &.is-active {
+          .tk-arrow {
+            transform: rotate(45deg) translate(-5px, -5px);
+
+            &:before {
+              transform: translate(10px, 0);
+            }
+            &:after {
+              transform: rotate(90deg) translate(10px, 0);
+            }
+          }
+        }
+      }
+
+      .tk-menu-body {
+        background-color: $light-gray;
+        padding: 0.75rem;
+        position: absolute;
+        z-index: -1;
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        transition: transform 0.2s ease-in-out;
+
+        &.is-active {
+          transform: translateY(100%);
+          transition: transform 0.2s ease-in-out;
+        }
+      }
+    }
 
     .menu-label a {
       color: $dark-gray;
@@ -539,18 +652,75 @@ $footer-color: white;
   }
 
   .tk-content {
+    position: relative;
     color: black;
     font-weight: 300;
-    font-size: 1.13rem;
-    max-width: 800px;
-    margin-left: 8%;
-    margin-right: 30px;
-    padding-bottom: 10rem;
+
+    @include mobile {
+      padding: 0;
+      font-size: 1rem;
+    }
+
+    @include tablet {
+      font-size: $body-font-size;
+      min-height: 90vh;
+      padding-bottom: 10rem;
+      max-width: 1220px;
+    }
+
+    @media screen and (max-width: 1400px) {
+      .tk-content-summary {
+        display: none;
+      }
+
+      .tk-markdown {
+        flex: none;
+        width: 100%;
+      }
+    }
+
+    .tk-content-summary {
+      font-size: 0.9rem;
+
+      a {
+        color: $gray;
+        font-weight: 500;
+
+        &:hover {
+          color: darken($gray);
+        }
+      }
+
+      ul {
+        list-style-type: none;
+        margin-left: 1.5em;
+        li {
+          margin-bottom: 0.5em;
+        }
+      }
+
+      > ul {
+        border-left: solid 1px $light-gray;
+        padding-left: 2rem;
+        margin: 0;
+      }
+
+      .tk-content-summary-menu {
+        position: sticky;
+        top: 4rem;
+      }
+    }
 
     h1.title {
-      font-size: 2.5rem;
-      // margin-bottom: 1.2rem;
       font-weight: 400;
+
+      @mobile {
+        font-size: 2rem;
+      }
+
+      @tablet {
+        font-size: 2.5rem;
+      }
     }
 
     h1:not(.title) {
@@ -558,10 +728,15 @@ $footer-color: white;
       padding-bottom: 0.5rem;
       border-bottom: solid 1px $light-gray;
     }
-
     h2 {
       font-size: 1.2rem;
       margin-bottom: 1rem;
+    }
+    h3 {
+      font-size: 1.1rem;
+    }
+    h4 {
+      font-size: 1rem;
     }
 
     a {
@@ -573,24 +748,40 @@ $footer-color: white;
     }
 
     // Smaller bullet size
-    li {
-      list-style-type: none;
-      position: relative; /* It's needed for setting position to absolute in the next rule. */
-    }
-    li:not(:last-child) {
-      margin-bottom: 1rem;
-    }
+    .tk-markdown {
+      li {
+        list-style-type: none;
+        position: relative; /* It's needed for setting position to absolute in the next rule. */
+      }
+      li:not(:last-child) {
+        margin-bottom: 1rem;
+      }
 
-    li::before {
-      content: "·";
-      position: absolute;
-      left: -1.1rem;
-      top: -1.15rem;
-      font-size: 2.7rem;
+      li::before {
+        content: "·";
+        position: absolute;
+        left: -1.1rem;
+        top: -1.15rem;
+        font-size: 2.7rem;
+      }
+
+      .is-warning {
+        background: lighten($magenta);
+        color: $magenta;
+
+        strong,
+        code {
+          color: $magenta;
+        }
+      }
+
+      blockquote.is-warning {
+        border-left-color: $magenta;
+      }
     }
 
     code {
-      color: $dark-gray;
+      color: black;
     }
   }
 }
@@ -609,15 +800,14 @@ $footer-color: white;
         display: block;
         margin-top: 1rem;
       }
-    }
 
-    .icon {
-      margin-left: 0.5rem;
+      .icon {
+        margin-left: 0.5rem;
 
-      svg {
-        height: 2rem;
-        width: 2rem;
-        transform: translateY(0.6rem);
+        svg {
+          height: 2rem;
+          width: 2rem;
+        }
       }
     }
   }
@@ -631,11 +821,174 @@ $footer-color: white;
     }
   }
 
-  .tk-footer-libs, .tk-footer-libs a {
+  .tk-footer-libs,
+  .tk-footer-libs a {
     color: white;
   }
 
   .tk-lib-name {
     font-weight: 600;
   }
+}
+
+.tk-help-links {
+  .icon {
+    svg {
+      transform: translateY(30%);
+    }
+  }
+}
+
+.tk-doc-footer {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid $light-gray;
+
+  .tk-next,
+  .tk-prev {
+    font-size: 0.9rem;
+
+    a {
+      font-weight: 500;
+    }
+
+    .tk-arrow {
+      display: inline-block;
+      width: 1.4rem;
+      height: 1.4rem;
+      vertical-align: 0%;
+    }
+  }
+
+  .tk-help-links {
+    font-size: 0.9rem;
+
+    .icon {
+      margin-left: 0.3rem;
+      svg {
+        width: 1.5rem;
+        height: 1.5rem;
+      }
+    }
+    .tk-svg-path {
+      fill: black !important;
+    }
+  }
+
+  .tk-edit-this-page {
+    font-size: 0.9rem;
+  }
+}
+
+/*
+ *
+ * Syntax highlighting
+ *
+ */
+
+/*
+Docco style used in http://jashkenas.github.com/docco/ converted by Simon Madine (@thingsinjars)
+*/
+
+// .hljs {
+//   display: block;
+//   overflow-x: auto;
+//   padding: 0.5em;
+//   color: #000;
+//   background: #f8f8ff;
+// }
+
+.hljs {
+  display: block;
+  overflow-x: scroll;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: $gray;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-subst {
+  color: $magenta;
+}
+
+// .hljs-literal {
+//   color: $dark-gray;
+//   font-weight: bold;
+// }
+
+.hljs-number {
+  color: darken($green);
+}
+
+.hljs-string,
+.hljs-doctag {
+  color: darken($green);
+}
+
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-section,
+.hljs-type {
+  color: $blue;
+}
+
+.hljs-params {
+  color: $purple;
+}
+
+.hljs-title {
+  color: $purple;
+  font-weight: bold;
+}
+
+.hljs-tag,
+.hljs-name,
+.hljs-attribute {
+  color: darken($blue);
+  font-weight: normal;
+}
+
+.hljs-variable,
+.hljs-template-variable {
+  color: darken($green);
+}
+
+.hljs-regexp,
+.hljs-link {
+  color: $green;
+}
+
+.hljs-symbol,
+.hljs-bullet {
+  color: $purple;
+}
+
+.hljs-built_in,
+.hljs-builtin-name {
+  color: darken($yellow);
+}
+
+.hljs-meta {
+  color: $dark-gray;
+  font-weight: bold;
+}
+
+.hljs-deletion {
+  background: $red;
+}
+
+.hljs-addition {
+  background: $green;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
 }

@@ -1,3 +1,6 @@
+import { useCallback, useState } from "react";
+import classnames from "classnames";
+
 const monthNames = [
   "January",
   "February",
@@ -23,23 +26,44 @@ export default function Menu({ href, menu }) {
     );
   });
 
+  const [expanded, setExpanded] = useState(false);
+
+  const toggleExpand = useCallback(() => {
+    setExpanded((prev) => !prev);
+  }, []);
+
   return (
     <aside className="menu">
-      {groups}
+      <div
+        className={classnames("tk-toc is-hidden-tablet", {
+          "is-active": expanded,
+        })}
+      >
+        <a href="#" onClick={() => toggleExpand()}>
+          TABLE OF CONTENTS
+          <span className="icon">
+            <span className="tk-arrow"></span>
+          </span>
+        </a>
+      </div>
 
-      {/* TODO: hook this up, only when needed */}
-      <p className="menu-label tk-menu-back">
-        <img
-          src="/img/left-arrow.svg"
-          style={{
-            display: "inline-block",
-            verticalAlign: "middle",
-            height: "0.8rem",
-            marginRight: "0.5rem",
-          }}
-        />
-        <a>All Libraries</a>
-      </p>
+      <div className={classnames("tk-menu-body", { "is-active": expanded })}>
+        {groups}
+
+        {/* TODO: hook this up, only when needed */}
+        {/* <p className="menu-label tk-menu-back">
+          <img
+            src="/img/arrow-left-small.svg"
+            style={{
+              display: "inline-block",
+              verticalAlign: "middle",
+              height: "0.8rem",
+              marginRight: "0.5rem",
+            }}
+          />
+          <a>All Libraries</a>
+        </p> */}
+      </div>
     </aside>
   );
 }
@@ -71,7 +95,7 @@ function Level1({ href, menu }) {
         {link}
         {hasNested && (
           <ul>
-            <Level2 href={href} menu={entry.nested} />
+            <Level2 href={href} menu={entry} />
           </ul>
         )}
       </li>
@@ -82,7 +106,7 @@ function Level1({ href, menu }) {
 }
 
 function Level2({ href, menu }) {
-  const items = pagesFor(menu).map((page) => {
+  const items = pagesFor(menu.nested).map((page) => {
     const className = href.startsWith(page.href) ? "is-active" : "";
     return (
       <li key={page.key} className={className}>
@@ -90,6 +114,15 @@ function Level2({ href, menu }) {
       </li>
     );
   });
+
+  if (menu.data.subtitle) {
+    const className = href == menu.href ? "is-active" : "";
+    items.unshift((
+      <li key={menu.key} className={className}>
+        <a href={menu.href}>{menu.data.subtitle}</a>
+      </li>
+    ));
+  }
 
   return <ul>{items}</ul>;
 }

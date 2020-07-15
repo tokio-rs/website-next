@@ -5,15 +5,19 @@ const menu = {
   tokio: {
     title: "Tokio",
     nested: {
-      overview: {
-        nested: ["reliable", "fast", "easy", "flexible"],
+      tutorial: {
+        nested: [
+          "hello-tokio",
+          "spawning",
+          "shared-state",
+          "channels",
+          "io",
+          "framing",
+          "async",
+          "select",
+        ],
       },
-      "getting-started": {
-        nested: ["hello-world", "cargo-dependencies", "echo"],
-      },
-      topics: {
-        nested: ["concurrency"],
-      },
+      glossary: {},
       api: {
         title: "API documentation",
         href: "https://docs.rs/tokio",
