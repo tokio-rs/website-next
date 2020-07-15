@@ -33,6 +33,7 @@ Then, open `main.rs` and replace the contents of the file with:
 ```rust
 use mini_redis::{client, Result};
 
+# fn dox() {
 #[tokio::main]
 pub async fn main() -> Result<()> {
     // Open a connection to the mini-redis address.
@@ -48,6 +49,7 @@ pub async fn main() -> Result<()> {
 
     Ok(())
 }
+# }
 ```
 
 Make sure the Mini-Redis server is running. In a separate terminal window, run:
@@ -71,15 +73,21 @@ Let's take some time to go over what we just did. There isn't much code, but a
 lot is happening.
 
 ```rust
+# use mini_redis::client;
+# async fn dox() -> mini_redis::Result<()> {
 let mut client = client::connect("127.0.0.1:6379").await?;
+# Ok(())
+# }
 ```
 
-The `client::connect` function is provided by the `mini-redis` crate. It
+The [`client::connect`] function is provided by the `mini-redis` crate. It
 asynchronously establishes a TCP connection with the specified remote address.
 Once the connection is established, a `client` handle is returned. Even though
 the operation is performed asynchronously, the code we write **looks**
 synchronous. The only indication that the operation is asynchronous is the
 `.await` operator.
+
+[`client::connect`]: https://docs.rs/mini-redis/0.1/mini_redis/client/fn.connect.html
 
 ## What is asynchronous programming?
 
@@ -109,8 +117,13 @@ Functions that perform asynchonous operations are labeled with the `async`
 keyword. In our example, the `connect` function is defined like this:
 
 ```rust
+use mini_redis::Result;
+use mini_redis::client::Client;
+use tokio::net::ToSocketAddrs;
+
 pub async fn connect<T: ToSocketAddrs>(addr: T) -> Result<Client> {
-    ...
+    // ...
+# unimplemented!()
 }
 ```
 
@@ -121,7 +134,7 @@ fn` yield control back to the thread. The thread may do other work while the
 operation processes in the background.
 
 [[warning]]
-| Note, while other languages implement [`async/await`], Rust takes a unique
+| Although other languages implement [`async/await`] too, Rust takes a unique
 | approach. Primarily, Rust's async operations are **lazy**. This results in
 | different runtime semantics than other languages.
 
