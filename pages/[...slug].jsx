@@ -6,7 +6,7 @@ const menu = {
     title: "Tokio",
     nested: {
       overview: {
-        nested: ["reliable", "fast", "easy", "flexible"],
+        nested: ["what", "why"],
       },
       tutorial: {
         nested: [
