@@ -35,7 +35,10 @@ use mini_redis::{Connection, Frame};
 # fn dox() {
 #[tokio::main]
 async fn main() {
-    // Bind the listener to the address
+    // Bind the listener to the address.
+    //
+    // If you are not using the "full" feature, this requires enabling
+    // the "dns" feature of Tokio.
     let mut listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
 
     loop {
