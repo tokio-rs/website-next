@@ -7,16 +7,14 @@ import SocialLinks from "./social-links";
 type Blog = any;
 
 const Brand: FC = () => (
-  <Link href="/">
-    <a className="navbar-item">
-      <img
-        src="/img/tokio-horizontal.svg"
-        alt="tokio-logo"
-        width="133"
-        height="56"
-      />
-    </a>
-  </Link>
+  <a href="/" className="navbar-item">
+    <img
+      src="/img/tokio-horizontal.svg"
+      alt="tokio-logo"
+      width="133"
+      height="56"
+    />
+  </a>
 );
 
 const Links: FC<{ blog: Blog }> = ({ blog }) => {
