@@ -1,6 +1,5 @@
 import React, { FC, useCallback, useState } from "react";
 import classnames from "classnames";
-import Link from "next/link";
 import SocialLinks from "./social-links";
 
 // TODO: what is this thing??
