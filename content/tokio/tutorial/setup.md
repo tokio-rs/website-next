@@ -29,7 +29,7 @@ somewhere and are happy to help.
 
 # Prerequisites
 
-Readers should already be familiar with the [Rust]. The [Rust book][book] is an
+Readers should already be familiar with [Rust]. The [Rust book][book] is an
 excellent resource to get started with.
 
 You should already have a basic idea about **what** Tokio is. If not, start
@@ -43,7 +43,7 @@ No pre-existing knowledge of Redis is required.
 [here]: /tokio/overview
 [rust]: https://rust-lang.org
 [book]: https://doc.rust-lang.org/book/
-[std]: doc.rust-lang.org/std/
+[std]: https://doc.rust-lang.org/std/
 
 ## Rust
 
