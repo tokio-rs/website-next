@@ -48,8 +48,7 @@ async fn main() {
 
 Like iterators, the `next()` method returns `Option<T>` where `T` is the
 stream's value type. Receiving `None` indicates that stream iteration is
-terminated. Note that, as with [`Iterator`], receiving `None` does not indicate
-that the stream will never return `Some` in the future.
+terminated.
 
 ## Mini-Redis broadcast
 
@@ -110,10 +109,10 @@ A task is spawned to publish messages to the Mini-Redis server on the "numbers"
 channel. Then, on the main task, we subscribe to the "numbers" channel and
 display received messages.
 
-After subscribing, `into_stream()` is called on the returned subscriber. This
+After subscribing, [`into_stream()`] is called on the returned subscriber. This
 consumes the `Subscriber`, returning a stream that yields messages as they
 arrive. Before we start iterating the messages, note that the stream is
-[pinned][pin] to the stack using `tokio::pin!`. Calling `next()` on a stream
+[pinned][pin] to the stack using [`tokio::pin!`]. Calling `next()` on a stream
 requires the stream to be [pinned][pin]. The `into_stream()` function returns a
 stream that is *not* pin, we must explicitly pin it in order to iterate it.
 
@@ -285,6 +284,8 @@ got = b"3"
 got = b"6"
 ```
 
+Another option would be to combine the [`filter`] and [`map`] steps into a single call using [`filter_map`].
+
 There are more available adapters. See the list [here][`StreamExt`].
 
 # Implementing `Stream`
@@ -409,6 +410,7 @@ stream! {
 
 [iter]: https://doc.rust-lang.org/book/ch13-02-iterators.html
 [`Stream`]: https://docs.rs/tokio/0.2/tokio/stream/trait.Stream.html
+[`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
 [`StreamExt`]: https://docs.rs/tokio/0.2/tokio/stream/trait.StreamExt.html
 [rx]: https://docs.rs/tokio/0.2/tokio/sync/mpsc/struct.Receiver.html
 [`AsyncBufReadExt::lines()`]: https://docs.rs/tokio/0.2/tokio/io/trait.AsyncBufReadExt.html#method.lines
@@ -416,6 +418,9 @@ stream! {
 [`map`]: https://docs.rs/tokio/0.2/tokio/stream/trait.StreamExt.html#method.map
 [`take`]: https://docs.rs/tokio/0.2/tokio/stream/trait.StreamExt.html#method.take
 [`filter`]: https://docs.rs/tokio/0.2/tokio/stream/trait.StreamExt.html#method.filter
+[`filter_map`]: https://docs.rs/tokio/0.2/tokio/stream/trait.StreamExt.html#method.filter_map
 [pin]: https://doc.rust-lang.org/std/pin/index.html
 [async]: async
 [`async-stream`]: https://docs.rs/async-stream
+[`into_stream()`]: https://docs.rs/mini-redis/0.2/mini_redis/client/struct.Subscriber.html#method.into_stream
+[`tokio::pin!`]: https://docs.rs/tokio/0.2/tokio/macro.pin.html
