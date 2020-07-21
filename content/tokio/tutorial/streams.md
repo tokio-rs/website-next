@@ -20,10 +20,10 @@ receive half of a [`mpsc::Receiver`][rx] implements [`Stream`]. The
 [`AsyncBufReadExt::lines()`] method takes a buffered I/O reader and returns a
 [`Stream`] where each value represents a line of data.
 
-# Iterating
+# Iteration
 
 Currently, the Rust programming language does not support async `for` loops.
-Instead, iterating streams is done using `while let` loops paired with
+Instead, iterating streams is done using a `while let` loop paired with
 [`StreamExt::next()`][next].
 
 ```rust
@@ -192,7 +192,7 @@ Let's see how we can work with streams to expand on this program.
 
 # Adapters
 
-Functions which take a [`Stream`] and return another [`Stream`] are often called
+Functions that take a [`Stream`] and return another [`Stream`] are often called
 'stream adapters', as they're a form of the 'adapter pattern'. Common stream
 adaptors include [`map`], [`take`], and [`filter`].
 
@@ -247,7 +247,8 @@ let messages = subscriber
 Running the program again, we get:
 
 ```text
-got = Ok(Message { channel: "numbers", content: b"1" })got = Ok(Message { channel: "numbers", content: b"3" })
+got = Ok(Message { channel: "numbers", content: b"1" })
+got = Ok(Message { channel: "numbers", content: b"3" })
 got = Ok(Message { channel: "numbers", content: b"6" })
 ```
 
@@ -308,7 +309,7 @@ pub trait Stream {
 }
 ```
 
-The `poll_next()` function is much like `Future::poll`, except it can be called
+The `Stream::poll_next()` function is much like `Future::poll`, except it can be called
 repeatedly to receive many values from the stream. Just as we saw in [Async in
 depth][async], when a stream is **not** ready to return a value, `Poll::Pending`
 is returned instead. The task's waker is registered. Once the stream should be
@@ -368,7 +369,7 @@ impl Stream for Interval {
 
 Manually implemening streams using the [`Stream`] trait can be tedious.
 Unfortunatly, the Rust programming language does not yet support `async/await`
-syntax for defining streams. This is in the workds, but not ready yet.
+syntax for defining streams. This is in the works, but not yet ready.
 
 The [`async-stream`] crate is available as a temporary solution. This crate
 provides an `async_stream!` macro that transforms the input into a stream. Using
@@ -410,11 +411,11 @@ stream! {
 [`Stream`]: https://docs.rs/tokio/0.2/tokio/stream/trait.Stream.html
 [`StreamExt`]: https://docs.rs/tokio/0.2/tokio/stream/trait.StreamExt.html
 [rx]: https://docs.rs/tokio/0.2/tokio/sync/mpsc/struct.Receiver.html
-[`AsyncBufReadExt::lines()`]: https://docs.rs/tokio/0.2.21/tokio/io/trait.AsyncBufReadExt.html#method.lines
+[`AsyncBufReadExt::lines()`]: https://docs.rs/tokio/0.2/tokio/io/trait.AsyncBufReadExt.html#method.lines
 [next]: https://docs.rs/tokio/0.2/tokio/stream/trait.StreamExt.html#method.next
-[`map`]: https://docs.rs/tokio/0.2.21/tokio/stream/trait.StreamExt.html#method.map
-[`take`]: https://docs.rs/tokio/0.2.21/tokio/stream/trait.StreamExt.html#method.take
-[`filter`]: https://docs.rs/tokio/0.2.21/tokio/stream/trait.StreamExt.html#method.filter
+[`map`]: https://docs.rs/tokio/0.2/tokio/stream/trait.StreamExt.html#method.map
+[`take`]: https://docs.rs/tokio/0.2/tokio/stream/trait.StreamExt.html#method.take
+[`filter`]: https://docs.rs/tokio/0.2/tokio/stream/trait.StreamExt.html#method.filter
 [pin]: https://doc.rust-lang.org/std/pin/index.html
 [async]: async
 [`async-stream`]: https://docs.rs/async-stream
